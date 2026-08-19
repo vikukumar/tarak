@@ -1,0 +1,60 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - typecheck
+    - unused
+    - misspell
+    - gofmt
+    - goimports
+    - revive
+    - godot
+    - noctx
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+  govet:
+    enable-all: false
+    settings:
+      printf:
+        funcs:
+          - (go.uber.org/zap.SugaredLogger).Infof
+          - (go.uber.org/zap.SugaredLogger).Warnf
+          - (go.uber.org/zap.SugaredLogger).Errorf
+  misspell:
+    locale: US
+  revive:
+    severity: warning
+    rules:
+      - name: exported
+      - name: var-naming
+      - name: blank-imports
+      - name: error-return
+      - name: error-strings
+      - name: increment-decrement
+
+issues:
+  exclude-rules:
+    # Allow unused imports in test files.
+    - path: _test\.go
+      linters:
+        - unused
+    # Allow long lines in generated/large struct definitions.
+    - path: api/
+      linters:
+        - godot
+    # Allow lower-case exported type aliases.
+    - text: "exported type alias"
+      linters:
+        - revive
+  max-issues-per-linter: 50
+  max-same-issues: 10

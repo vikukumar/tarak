@@ -1,0 +1,41 @@
+# Binaries & Compiled Files
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go build & test cache
+vendor/
+coverage.txt
+coverage.out
+coverage.html
+profile.out
+
+# Runtime data & Local Cluster state
+data/
+cert/
+*.key
+*.pem
+*.crt
+kubeconfig.yaml
+kubeconfig.yml
+
+# IDE & Editor artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files & Logs
+tmp/
+*.log
+scratch/

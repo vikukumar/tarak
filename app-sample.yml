@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: demo
+  labels:
+    app: web-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 80
+          name: http
+---
+# Standard ClusterIP Service (Internal cluster routing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-svc
+  namespace: demo
+  labels:
+    app: web-app
+spec:
+  type: ClusterIP
+  selector:
+    app: web-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+---
+# MetalLB / Public IP LoadBalancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-lb
+  namespace: demo
+  annotations:
+    # MetalLB IPAddressPool selection annotation
+    metallb.universe.tf/address-pool: public-ip-pool
+    metallb.universe.tf/allow-shared-ip: "web-svc-key"
+  labels:
+    app: web-app
+spec:
+  type: LoadBalancer
+  # You can either request a specific static IP or let MetalLB allocate one from the pool:
+  loadBalancerIP: "192.168.1.240"
+  allocateLoadBalancerNodePorts: true
+  selector:
+    app: web-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+---
+# Native Tarak Security Policy
+apiVersion: security.tarak.io/v1
+kind: TarakSecurityPolicy
+metadata:
+  name: web-app-policy
+  namespace: demo
+spec:
+  defaultAction: Allow
+  rules:
+  - action: Allow
+    protocol: TCP
+    ports:
+    - 80
+    - 443

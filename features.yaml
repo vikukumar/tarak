@@ -1,0 +1,430 @@
+features:
+  # Phase 1 — Cluster Core
+  - name: state-store-bbolt
+    status: complete
+    phase: 1
+    implementation: internal/statestore/bolt.go
+    tests: internal/statestore/bolt_test.go
+    documentation: README.md
+    limitations:
+      - Single-node only in Phase 1; Raft replication added in Phase 8
+      - Watch ring buffer bounded to 65536 events by default
+
+  - name: api-server
+    status: complete
+    phase: 1
+    implementation: internal/server/server.go
+    tests: pkg/api/handler/resource_test.go
+    documentation: README.md
+    limitations:
+      - Phase 1 does not include full RBAC enforcement (Phase 7)
+      - Server-side apply (strategic merge patch) added in Phase 9
+
+  - name: watch-streams
+    status: complete
+    phase: 1
+    implementation: pkg/api/watch/watcher.go
+    tests: internal/statestore/bolt_test.go
+    documentation: ""
+    limitations:
+      - Watch uses HTTP chunked streaming; WebSocket upgrade deferred
+
+  - name: tls-bootstrap
+    status: complete
+    phase: 1
+    implementation: pkg/security/ca.go
+    tests: pkg/security/ca_test.go
+    documentation: ""
+    limitations:
+      - Phase 1 generates self-signed root CA; external CA integration in Phase 7
+
+  - name: cert-auth
+    status: complete
+    phase: 1
+    implementation: pkg/security/ca.go, pkg/api/middleware/auth.go
+    tests: pkg/security/ca_test.go
+    documentation: ""
+    limitations:
+      - OIDC authentication deferred to Phase 7
+
+  - name: token-auth
+    status: complete
+    phase: 1
+    implementation: pkg/security/token.go, pkg/api/middleware/auth.go
+    tests: pkg/security/ca_test.go
+    documentation: ""
+    limitations:
+      - Static bootstrap token only; full ServiceAccount token controller in Phase 7
+
+  - name: resource-crud
+    status: complete
+    phase: 1
+    implementation: pkg/api/handler/resource.go
+    tests: pkg/api/handler/resource_test.go
+    documentation: ""
+    limitations:
+      - Strategic merge patch deferred to Phase 9
+      - Server-side apply deferred to Phase 9
+
+  - name: label-selectors
+    status: complete
+    phase: 1
+    implementation: api/meta/selectors.go, internal/statestore/index.go
+    tests: internal/statestore/bolt_test.go
+    documentation: ""
+    limitations: []
+
+  - name: field-selectors
+    status: complete
+    phase: 1
+    implementation: api/meta/selectors.go, internal/statestore/index.go
+    tests: internal/statestore/bolt_test.go
+    documentation: ""
+    limitations:
+      - Only metadata.name and metadata.namespace field selectors in Phase 1
+
+  - name: pagination
+    status: complete
+    phase: 1
+    implementation: pkg/api/handler/resource.go
+    tests: pkg/api/handler/resource_test.go
+    documentation: ""
+    limitations: []
+
+  - name: optimistic-concurrency
+    status: complete
+    phase: 1
+    implementation: internal/statestore/bolt.go
+    tests: internal/statestore/bolt_test.go
+    documentation: ""
+    limitations: []
+
+  - name: resource-versions
+    status: complete
+    phase: 1
+    implementation: internal/statestore/envelope.go
+    tests: internal/statestore/bolt_test.go
+    documentation: ""
+    limitations: []
+
+  - name: namespaces
+    status: complete
+    phase: 1
+    implementation: api/core/v1/types.go, pkg/api/handler/resource.go
+    tests: tests/integration/api_test.go
+    documentation: ""
+    limitations: []
+
+  - name: api-discovery
+    status: complete
+    phase: 1
+    implementation: internal/server/server.go
+    tests: tests/integration/api_test.go
+    documentation: ""
+    limitations:
+      - OpenAPI v3 deferred; v2 only in Phase 1
+
+  - name: audit-logging
+    status: complete
+    phase: 1
+    implementation: pkg/api/middleware/audit.go
+    tests: ""
+    documentation: ""
+    limitations:
+      - Audit policy configuration deferred to Phase 7
+
+  - name: secrets-encryption-at-rest
+    status: complete
+    phase: 1
+    implementation: pkg/security/encryption.go
+    tests: tests/integration/api_test.go
+    documentation: ""
+    limitations: []
+
+  - name: tarakctl-cli
+    status: complete
+    phase: 1
+    implementation: cmd/tarakctl/main.go
+    tests: ""
+    documentation: README.md
+    limitations: []
+
+  - name: tarak-init
+    status: complete
+    phase: 1
+    implementation: cmd/tarak/main.go
+    tests: ""
+    documentation: README.md
+    limitations:
+      - Single-node only; multi-node join in Phase 8
+
+  - name: prometheus-metrics
+    status: complete
+    phase: 1
+    implementation: pkg/metrics/metrics.go
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: health-endpoints
+    status: complete
+    phase: 1
+    implementation: pkg/health/health.go
+    tests: tests/integration/api_test.go
+    documentation: ""
+    limitations: []
+
+  # Phase 2 — Runtime (planned)
+  - name: node-agent
+    status: planned
+    phase: 2
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: oci-runtime
+    status: planned
+    phase: 2
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: pod-lifecycle
+    status: planned
+    phase: 2
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: image-management
+    status: planned
+    phase: 2
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 3 — Scheduler (planned)
+  - name: scheduler
+    status: planned
+    phase: 3
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: scheduler-filter
+    status: planned
+    phase: 3
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: scheduler-score
+    status: planned
+    phase: 3
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: preemption
+    status: planned
+    phase: 3
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 4 — Controllers (planned)
+  - name: replicaset-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: deployment-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: statefulset-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: daemonset-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: job-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: cronjob-controller
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: garbage-collector
+    status: planned
+    phase: 4
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 5 — Networking (planned)
+  - name: pod-networking
+    status: planned
+    phase: 5
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: service-networking
+    status: planned
+    phase: 5
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: cluster-dns
+    status: planned
+    phase: 5
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: network-policy
+    status: planned
+    phase: 5
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: ingress
+    status: planned
+    phase: 5
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 6 — Storage (planned)
+  - name: persistent-volumes
+    status: planned
+    phase: 6
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: persistent-volume-claims
+    status: planned
+    phase: 6
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: storage-class
+    status: planned
+    phase: 6
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: dynamic-provisioning
+    status: planned
+    phase: 6
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 7 — Security (planned)
+  - name: rbac
+    status: planned
+    phase: 7
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: service-accounts
+    status: planned
+    phase: 7
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: admission-webhooks
+    status: planned
+    phase: 7
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: oidc-auth
+    status: planned
+    phase: 7
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  # Phase 8 — HA (planned)
+  - name: raft-replication
+    status: planned
+    phase: 8
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: leader-election
+    status: planned
+    phase: 8
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
+
+  - name: control-plane-failover
+    status: planned
+    phase: 8
+    implementation: ""
+    tests: ""
+    documentation: ""
+    limitations: []
