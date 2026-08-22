@@ -471,6 +471,60 @@ func TestTarakIOGroupsAndCRDs(t *testing.T) {
 	assert.Contains(t, string(body), "secure-web-app")
 }
 
+func TestIngressAndTunnels_Integration(t *testing.T) {
+	s := startTestServer(t)
+
+	// 1. Check bootstrapped IngressClasses
+	resp, body := s.get("/apis/networking.k8s.io/v1/ingressclasses")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "tarak")
+	assert.Contains(t, string(body), "tarak-cloudflare")
+	assert.Contains(t, string(body), "tarak-tailscale")
+
+	// 2. Create Ingress
+	ingObj := map[string]interface{}{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind":       "Ingress",
+		"metadata": map[string]interface{}{
+			"name":      "demo-ingress",
+			"namespace": "default",
+		},
+		"spec": map[string]interface{}{
+			"ingressClassName": "tarak-cloudflare",
+			"rules": []map[string]interface{}{
+				{
+					"host": "app.vikshro.in",
+					"http": map[string]interface{}{
+						"paths": []map[string]interface{}{
+							{
+								"path":     "/",
+								"pathType": "Prefix",
+								"backend": map[string]interface{}{
+									"service": map[string]interface{}{
+										"name": "web-app-svc",
+										"port": map[string]interface{}{
+											"number": 80,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	resp, body = s.post("/apis/networking.k8s.io/v1/namespaces/default/ingresses", ingObj)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Contains(t, string(body), "demo-ingress")
+
+	// 3. Inspect Tunnels API
+	resp, body = s.get("/apis/networking.tarak.io/v1/tunnels")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "cloudflare")
+	assert.Contains(t, string(body), "tailscale")
+}
+
 // ─── JSON path helper ─────────────────────────────────────────────────────────
 
 // jsonPath extracts a nested string value from a JSON object by path.

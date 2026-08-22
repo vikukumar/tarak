@@ -83,3 +83,24 @@ spec:
     ports:
     - 80
     - 443
+---
+# Ingress with Cloudflare Tunnel & Tailscale routing
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-ingress
+  namespace: demo
+spec:
+  ingressClassName: tarak-cloudflare
+  rules:
+  - host: app.vikshro.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-app-svc
+            port:
+              number: 80
+

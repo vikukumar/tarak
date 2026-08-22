@@ -114,6 +114,7 @@ and administering Tarak clusters with full Kubernetes compatibility.`,
 	root.AddCommand(newScaleCmd())
 	root.AddCommand(newRolloutCmd())
 	root.AddCommand(newRuntimeCmd())
+	root.AddCommand(newTunnelCmd())
 
 	// Discovery and introspection
 	root.AddCommand(newAPIResourcesCmd())
@@ -3767,3 +3768,72 @@ func newRuntimeCmd() *cobra.Command {
 
 	return cmd
 }
+
+// ─── tunnel ───────────────────────────────────────────────────────────────────
+
+func newTunnelCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "tunnel",
+		Aliases: []string{"tunnels", "tun"},
+		Short:   "Inspect and manage Cloudflare and Tailscale tunnels",
+	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List active Cloudflare & Tailscale tunnels and public URLs",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := newClient()
+			if err != nil {
+				return err
+			}
+			url := fmt.Sprintf("%s/apis/networking.tarak.io/v1/tunnels", client.serverURL)
+			body, err := client.get(url)
+			if err != nil {
+				return err
+			}
+
+			var resp struct {
+				Items []struct {
+					Type      string    `json:"type"`
+					Active    bool      `json:"active"`
+					PublicURL string    `json:"publicURL"`
+					Mode      string    `json:"mode"`
+					StartedAt time.Time `json:"startedAt"`
+					LastError string    `json:"lastError"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return fmt.Errorf("decode tunnels: %w", err)
+			}
+
+			if globals.Output == "json" {
+				out, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(out))
+				return nil
+			}
+
+			w := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+			fmt.Fprintln(w, "TYPE\tSTATUS\tMODE\tPUBLIC URL\tAGE")
+			for _, t := range resp.Items {
+				statusStr := "Inactive"
+				if t.Active {
+					statusStr = "Active"
+				}
+				urlStr := t.PublicURL
+				if urlStr == "" {
+					urlStr = "<none>"
+				}
+				ageStr := "<unknown>"
+				if !t.StartedAt.IsZero() {
+					ageStr = time.Since(t.StartedAt).Round(time.Second).String()
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", strings.ToUpper(t.Type), statusStr, t.Mode, urlStr, ageStr)
+			}
+			return w.Flush()
+		},
+	})
+
+	return cmd
+}
+

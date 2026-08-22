@@ -102,6 +102,11 @@ func newServerCommand() *cobra.Command {
 
 	f := cmd.Flags()
 	f.StringVar(&cfg.BindAddress, "bind-address", "0.0.0.0:6443", "Address and port to listen on")
+	f.StringVar(&cfg.IngressHTTPAddress, "ingress-http-addr", "0.0.0.0:8080", "Address and port for Ingress HTTP reverse proxy")
+	f.BoolVar(&cfg.CloudflareTunnel, "cloudflare-tunnel", false, "Enable built-in Cloudflare tunnel")
+	f.StringVar(&cfg.CloudflareToken, "cloudflare-token", "", "Optional Cloudflare Named Tunnel token")
+	f.BoolVar(&cfg.Tailscale, "tailscale", false, "Enable Tailscale mesh networking")
+	f.StringVar(&cfg.TailscaleAuthKey, "tailscale-authkey", "", "Tailscale authentication key")
 	f.StringVar(&cfg.DataDir, "data-dir", "/var/lib/tarak", "Root directory for persistent data")
 	f.StringVar(&cfg.PKIDir, "pki-dir", "", "PKI directory (default: <data-dir>/pki)")
 	f.StringVar(&cfg.StateStorePath, "state-store", "", "BoltDB state store path (default: <data-dir>/state.db)")

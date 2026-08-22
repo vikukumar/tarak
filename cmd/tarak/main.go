@@ -225,12 +225,17 @@ func writeKubeconfig(path, serverAddr string, caPEM, certPEM, keyPEM []byte) err
 
 func newServerCmd() *cobra.Command {
 	var (
-		dataDir         string
-		bindAddress     string
-		sans            []string
-		allowInsecure   bool
-		logLevel        string
-		shutdownTimeout time.Duration
+		dataDir          string
+		bindAddress      string
+		ingressHTTPAddr  string
+		cloudflareTunnel bool
+		cloudflareToken  string
+		tailscale        bool
+		tailscaleAuthKey string
+		sans             []string
+		allowInsecure    bool
+		logLevel         string
+		shutdownTimeout  time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -250,12 +255,17 @@ func newServerCmd() *cobra.Command {
 			defer logger.Sync() //nolint:errcheck
 
 			srv, err := server.New(server.Config{
-				BindAddress:       bindAddress,
-				DataDir:           dataDir,
-				AllowInsecureAuth: allowInsecure,
-				SANs:              sans,
-				Log:               logger,
-				ShutdownTimeout:   shutdownTimeout,
+				BindAddress:        bindAddress,
+				IngressHTTPAddress: ingressHTTPAddr,
+				CloudflareTunnel:   cloudflareTunnel,
+				CloudflareToken:    cloudflareToken,
+				Tailscale:          tailscale,
+				TailscaleAuthKey:   tailscaleAuthKey,
+				DataDir:            dataDir,
+				AllowInsecureAuth:  allowInsecure,
+				SANs:               sans,
+				Log:                logger,
+				ShutdownTimeout:    shutdownTimeout,
 			})
 			if err != nil {
 				return fmt.Errorf("initialize server: %w", err)
@@ -270,6 +280,11 @@ func newServerCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir(), "Data directory")
 	cmd.Flags().StringVar(&bindAddress, "bind-address", "0.0.0.0:6443", "Bind address:port")
+	cmd.Flags().StringVar(&ingressHTTPAddr, "ingress-http-addr", "0.0.0.0:8080", "Ingress HTTP reverse proxy address:port")
+	cmd.Flags().BoolVar(&cloudflareTunnel, "cloudflare-tunnel", false, "Enable built-in Cloudflare tunneling")
+	cmd.Flags().StringVar(&cloudflareToken, "cloudflare-token", "", "Cloudflare Named Tunnel token")
+	cmd.Flags().BoolVar(&tailscale, "tailscale", false, "Enable Tailscale mesh networking")
+	cmd.Flags().StringVar(&tailscaleAuthKey, "tailscale-authkey", "", "Tailscale authentication key")
 	cmd.Flags().StringSliceVar(&sans, "tls-san", []string{"localhost", "127.0.0.1"}, "TLS SANs")
 	cmd.Flags().BoolVar(&allowInsecure, "insecure", false, "Allow unauthenticated access (dev only)")
 	cmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level: debug|info|warn|error")

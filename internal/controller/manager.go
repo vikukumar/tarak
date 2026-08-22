@@ -19,13 +19,14 @@ import (
 )
 
 // Manager is the native Tarak controller manager.
-// It watches and reconciles Deployments, Pods, Services, and MetalLB-style LoadBalancers.
+// It watches and reconciles Deployments, Pods, Services, MetalLB, and Ingress routes.
 type Manager struct {
-	store   statestore.Store
-	runtime runtime.Runtime
-	log      *zap.Logger
-	mu       sync.Mutex
-	backoffs map[string]time.Time
+	store       statestore.Store
+	runtime     runtime.Runtime
+	log         *zap.Logger
+	mu          sync.Mutex
+	backoffs    map[string]time.Time
+	ingressFunc func(ctx context.Context)
 }
 
 // NewManager constructs a new controller manager.
@@ -45,9 +46,16 @@ func NewManager(store statestore.Store, rt runtime.Runtime, log *zap.Logger) *Ma
 	}
 }
 
+// SetIngressReconciler attaches an external Ingress reconciler callback.
+func (m *Manager) SetIngressReconciler(fn func(ctx context.Context)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ingressFunc = fn
+}
+
 // Start launches the background reconciliation loop.
 func (m *Manager) Start(ctx context.Context) {
-	m.log.Info("starting Tarak native control loops (Deployments, Pods, Services, MetalLB)")
+	m.log.Info("starting Tarak native control loops (Deployments, Pods, Services, Ingress, MetalLB)")
 	go m.runLoop(ctx)
 }
 
@@ -74,6 +82,13 @@ func (m *Manager) reconcileAll(ctx context.Context) {
 	m.reconcileDeployments(ctx, "apps.tarak.io", "v1")
 	m.reconcilePods(ctx)
 	m.reconcileServices(ctx, "", "v1") // services are stored under core group ""
+
+	m.mu.Lock()
+	fn := m.ingressFunc
+	m.mu.Unlock()
+	if fn != nil {
+		fn(ctx)
+	}
 }
 
 // ─── Deployment Controller ───────────────────────────────────────────────────

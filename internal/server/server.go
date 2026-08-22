@@ -51,8 +51,10 @@ import (
 	storagev1 "github.com/vikukumar/tarak/api/storage/v1"
 	tarakv1 "github.com/vikukumar/tarak/api/tarak/v1"
 	"github.com/vikukumar/tarak/internal/controller"
+	"github.com/vikukumar/tarak/internal/ingress"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
+	"github.com/vikukumar/tarak/internal/tunnel"
 	"github.com/vikukumar/tarak/internal/version"
 	"github.com/vikukumar/tarak/pkg/api/handler"
 	"github.com/vikukumar/tarak/pkg/api/middleware"
@@ -67,6 +69,22 @@ type Config struct {
 	// BindAddress is the address:port the API server listens on.
 	// Default: "0.0.0.0:6443"
 	BindAddress string
+
+	// IngressHTTPAddress is the address:port the Ingress HTTP router listens on.
+	// Default: "0.0.0.0:8080"
+	IngressHTTPAddress string
+
+	// CloudflareTunnel enables automated Cloudflare tunneling.
+	CloudflareTunnel bool
+
+	// CloudflareToken is the optional token for named Cloudflare tunnels.
+	CloudflareToken string
+
+	// Tailscale enables Tailscale mesh networking.
+	Tailscale bool
+
+	// TailscaleAuthKey is the authentication key for Tailscale.
+	TailscaleAuthKey string
 
 	// DataDir is the root directory for persistent data (state store, PKI).
 	DataDir string
@@ -98,13 +116,17 @@ type Config struct {
 
 // Server is a running Tarak API server instance.
 type Server struct {
-	cfg     Config
-	store   statestore.Store
-	runtime tarakruntime.Runtime
-	health  *health.Handler
-	metrics *metrics.Registry
-	log     *zap.Logger
-	httpSrv *http.Server
+	cfg           Config
+	store         statestore.Store
+	runtime       tarakruntime.Runtime
+	health        *health.Handler
+	metrics       *metrics.Registry
+	log           *zap.Logger
+	httpSrv       *http.Server
+	ingressRouter *ingress.Router
+	ingressCtrl   *ingress.Controller
+	cfManager     *tunnel.CloudflareManager
+	tsManager     *tunnel.TailscaleManager
 }
 
 // New creates a new Server from the given configuration.
@@ -261,6 +283,7 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 	r.Route("/apis/networking.tarak.io/v1", func(r chi.Router) {
 		r.Get("/", s.serveAPIResourceList("networking.tarak.io", "v1"))
+		r.Get("/tunnels", s.serveTunnels)
 		registerNetworkingResources("networking.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/rbac.authorization.tarak.io/v1", func(r chi.Router) {
@@ -310,15 +333,61 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("listen %s: %w", s.cfg.BindAddress, err)
 	}
 
+	// ── Ingress & Tunnels Initialization ─────────────────────────────────
+	s.ingressRouter = ingress.NewRouter(s.log)
+	s.ingressCtrl = ingress.NewController(s.store, s.ingressRouter, s.log)
+
+	s.cfManager = tunnel.NewCloudflareManager(tunnel.CloudflareTunnelConfig{
+		Enabled:   s.cfg.CloudflareTunnel,
+		Token:     s.cfg.CloudflareToken,
+		LocalPort: 8080,
+	}, s.ingressRouter, s.log)
+
+	s.tsManager = tunnel.NewTailscaleManager(tunnel.TailscaleConfig{
+		Enabled:  s.cfg.Tailscale,
+		AuthKey:  s.cfg.TailscaleAuthKey,
+		Hostname: "tarak-cluster",
+	}, s.ingressRouter, s.log)
+
+	_ = s.bootstrapIngressClasses(ctx)
+
+	if s.cfg.CloudflareTunnel {
+		_ = s.cfManager.Start(ctx, s.cfg.IngressHTTPAddress)
+	}
+	if s.cfg.Tailscale {
+		_ = s.tsManager.Start(ctx, 8080)
+	}
+
+	// Launch native Ingress HTTP reverse proxy listener in background
+	if s.cfg.IngressHTTPAddress != "" {
+		ingSrv := &http.Server{
+			Addr:    s.cfg.IngressHTTPAddress,
+			Handler: s.ingressRouter,
+		}
+		go func() {
+			<-ctx.Done()
+			_ = ingSrv.Close()
+		}()
+		go func() {
+			_ = ingSrv.ListenAndServe()
+		}()
+	}
+
 	// Signal ready BEFORE starting the TLS listener.
 	s.health.SetReady(true)
 	s.log.Info("tarak api server ready",
 		zap.String("address", s.cfg.BindAddress),
+		zap.String("ingressHTTP", s.cfg.IngressHTTPAddress),
+		zap.Bool("cloudflareTunnel", s.cfg.CloudflareTunnel),
+		zap.Bool("tailscale", s.cfg.Tailscale),
 		zap.Bool("insecureAuth", s.cfg.AllowInsecureAuth),
 	)
 
 	// ── Controller Manager ───────────────────────────────────────────────
 	ctrlMgr := controller.NewManager(s.store, s.runtime, s.log)
+	ctrlMgr.SetIngressReconciler(func(c context.Context) {
+		_ = s.ingressCtrl.Reconcile(c, s.cfManager.PublicURL())
+	})
 	ctrlMgr.Start(ctx)
 
 	// Serve in background.
@@ -679,6 +748,76 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) bootstrapIngressClasses(ctx context.Context) error {
+	classes := []struct {
+		name      string
+		isDefault bool
+	}{
+		{"tarak", true},
+		{"tarak-cloudflare", false},
+		{"tarak-tailscale", false},
+	}
+
+	for _, ic := range classes {
+		key := statestore.ResourceKey{
+			Group:    "networking.k8s.io",
+			Version:  "v1",
+			Resource: "ingressclasses",
+			Name:     ic.name,
+		}
+		annotations := map[string]string{}
+		if ic.isDefault {
+			annotations["ingressclass.kubernetes.io/is-default-class"] = "true"
+		}
+		obj := map[string]interface{}{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind":       "IngressClass",
+			"metadata": map[string]interface{}{
+				"name":        ic.name,
+				"annotations": annotations,
+			},
+			"spec": map[string]interface{}{
+				"controller": "tarak.io/ingress-controller",
+			},
+		}
+		raw, _ := json.Marshal(obj)
+		_, _ = s.store.Create(ctx, key, raw)
+	}
+	return nil
+}
+
+func (s *Server) serveTunnels(w http.ResponseWriter, r *http.Request) {
+	cfStatus := tunnel.TunnelStatus{
+		Type:   "cloudflare",
+		Active: s.cfg.CloudflareTunnel,
+		Mode:   "quick-tunnel",
+	}
+	if s.cfManager != nil {
+		st := s.cfManager.Status()
+		if st.Type != "" {
+			cfStatus = st
+		}
+	}
+
+	tsStatus := tunnel.TunnelStatus{
+		Type:   "tailscale",
+		Active: s.cfg.Tailscale,
+		Mode:   "magic-dns",
+	}
+	if s.tsManager != nil {
+		st := s.tsManager.Status()
+		if st.Type != "" {
+			tsStatus = st
+		}
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"apiVersion": "networking.tarak.io/v1",
+		"kind":       "TunnelList",
+		"items":      []tunnel.TunnelStatus{cfStatus, tsStatus},
+	})
+}
+
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -689,6 +828,9 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func applyDefaults(cfg *Config) {
 	if cfg.BindAddress == "" {
 		cfg.BindAddress = "0.0.0.0:6443"
+	}
+	if cfg.IngressHTTPAddress == "" {
+		cfg.IngressHTTPAddress = "0.0.0.0:8080"
 	}
 	if cfg.DataDir == "" {
 		cfg.DataDir = "/var/lib/tarak"
