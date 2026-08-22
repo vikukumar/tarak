@@ -220,49 +220,63 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Core API group (/api/v1).
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("", "v1"))
 		registerCoreResources(r, s.store, wh, s.log)
 	})
 
 	// Named API groups — standard k8s.io
 	r.Route("/apis/apps/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("apps", "v1"))
 		registerAppsResources("apps", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/batch/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("batch", "v1"))
 		registerBatchResources("batch", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/networking.k8s.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("networking.k8s.io", "v1"))
 		registerNetworkingResources("networking.k8s.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/rbac.authorization.k8s.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("rbac.authorization.k8s.io", "v1"))
 		registerRBACResources("rbac.authorization.k8s.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/storage.k8s.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("storage.k8s.io", "v1"))
 		registerStorageResources("storage.k8s.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/apiextensions.k8s.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("apiextensions.k8s.io", "v1"))
 		registerAPIExtensionsResources("apiextensions.k8s.io", r, s.store, wh, s.log)
 	})
 
 	// Named API groups — native tarak.io aliases & extensions
 	r.Route("/apis/apps.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("apps.tarak.io", "v1"))
 		registerAppsResources("apps.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/batch.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("batch.tarak.io", "v1"))
 		registerBatchResources("batch.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/networking.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("networking.tarak.io", "v1"))
 		registerNetworkingResources("networking.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/rbac.authorization.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("rbac.authorization.tarak.io", "v1"))
 		registerRBACResources("rbac.authorization.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/storage.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("storage.tarak.io", "v1"))
 		registerStorageResources("storage.tarak.io", r, s.store, wh, s.log)
 	})
 	r.Route("/apis/security.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("security.tarak.io", "v1"))
 		registerSecurityResources(r, s.store, wh, s.log)
 	})
 	r.Route("/apis/apiextensions.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("apiextensions.tarak.io", "v1"))
 		registerAPIExtensionsResources("apiextensions.tarak.io", r, s.store, wh, s.log)
 	})
 
