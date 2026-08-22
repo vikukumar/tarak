@@ -2,12 +2,11 @@ name: Deploy Documentation to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
-      - master
-    paths:
-      - 'docs/**'
-      - '.github/workflows/pages.yml'
+    tags:
+      - 'v*'
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
