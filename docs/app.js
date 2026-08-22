@@ -2,6 +2,11 @@
 // TARAK — Modern Documentation & Interactive App Controller
 // ==========================================================================
 
+// 0. Client-Side HTTPS Enforcer (Redirects HTTP -> HTTPS in production)
+if (window.location.protocol === 'http:' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+  window.location.replace(window.location.href.replace('http:', 'https:'));
+}
+
 const REPO = 'vikukumar/tarak';
 
 document.addEventListener('DOMContentLoaded', () => {
