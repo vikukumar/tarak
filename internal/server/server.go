@@ -58,6 +58,7 @@ import (
 	"github.com/vikukumar/tarak/internal/statestore"
 	"github.com/vikukumar/tarak/internal/telemetry"
 	"github.com/vikukumar/tarak/internal/tunnel"
+	"github.com/vikukumar/tarak/internal/ui"
 	"github.com/vikukumar/tarak/internal/version"
 	"github.com/vikukumar/tarak/pkg/api/handler"
 	"github.com/vikukumar/tarak/pkg/api/middleware"
@@ -344,6 +345,15 @@ func (s *Server) Run(ctx context.Context) error {
 	// TCR Runtime API
 	r.Get("/apis/runtime.tarak.io/v1/version", s.serveRuntimeVersion)
 	r.Get("/apis/runtime.tarak.io/v1/status", s.serveRuntimeStatus)
+
+	// ── Inbuilt Cluster Dashboard SPA Handlers ────────────────────────────
+	r.Handle("/dashboard", ui.Handler())
+	r.Handle("/dashboard/*", ui.Handler())
+	r.Handle("/assets/*", ui.Handler())
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/assets/tarak_icon.jpg"
+		ui.Handler().ServeHTTP(w, r)
+	})
 
 	// ── HTTP server ───────────────────────────────────────────────────────
 	s.httpSrv = &http.Server{
