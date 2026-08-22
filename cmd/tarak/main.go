@@ -60,6 +60,7 @@ built from first principles with full Kubernetes API compatibility.`,
 
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newServerCmd())
+	rootCmd.AddCommand(newAgentCmd())
 	rootCmd.AddCommand(newVersionCmd())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -273,6 +274,68 @@ func newServerCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowInsecure, "insecure", false, "Allow unauthenticated access (dev only)")
 	cmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level: debug|info|warn|error")
 	cmd.Flags().DurationVar(&shutdownTimeout, "shutdown-timeout", 30*time.Second, "Graceful shutdown deadline")
+
+	return cmd
+}
+
+// ─── tarak agent ────────────────────────────────────────────────────────────
+func newAgentCmd() *cobra.Command {
+	var (
+		dataDir   string
+		serverURL string
+		logLevel  string
+		nodeName  string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "agent",
+		Short: "Start the Tarak node worker runtime agent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var log *zap.Logger
+			var err error
+			if logLevel == "debug" {
+				log, err = zap.NewDevelopment()
+			} else {
+				log, err = zap.NewProduction()
+			}
+			if err != nil {
+				return fmt.Errorf("create logger: %w", err)
+			}
+			defer log.Sync() //nolint:errcheck
+
+			if nodeName == "" {
+				h, _ := os.Hostname()
+				nodeName = h
+			}
+
+			log.Info("starting tarak worker agent",
+				zap.String("version", version.Version),
+				zap.String("node", nodeName),
+				zap.String("dataDir", dataDir),
+			)
+
+			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					log.Info("shutting down tarak agent...")
+					return nil
+				case <-ticker.C:
+					// Keep agent active
+				}
+			}
+		},
+	}
+
+	cmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir(), "Data directory for containers")
+	cmd.Flags().StringVar(&serverURL, "server", "https://127.0.0.1:6443", "Tarak server URL")
+	cmd.Flags().StringVar(&nodeName, "node-name", "", "Node name override")
+	cmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level: debug|info|warn|error")
 
 	return cmd
 }
