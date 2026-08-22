@@ -28,11 +28,13 @@ LDFLAGS     := -s -w \
 
 BIN_DIR     := bin
 
+.PHONY: all build build-tarak build-server build-agent build-cli test test-race test-cover lint clean fmt vet dev
+
 all: build
 
 # ─── Build ────────────────────────────────────────────────────────────────────
 
-build: build-tarak build-server build-cli
+build: build-tarak build-server build-agent build-cli
 
 build-tarak:
 	@echo "Building tarak (all-in-one)..."
@@ -40,14 +42,20 @@ build-tarak:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/tarak ./cmd/tarak
 
 build-server:
-	@echo "Building tarakd..."
+	@echo "Building tarakd (server daemon)..."
 	@mkdir -p $(BIN_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/tarakd ./cmd/tarakd
 
+build-agent:
+	@echo "Building taraks (node worker agent)..."
+	@mkdir -p $(BIN_DIR)
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/taraks ./cmd/taraks
+
 build-cli:
-	@echo "Building tarakctl..."
+	@echo "Building tarakctl & taraktl (CLI)..."
 	@mkdir -p $(BIN_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/tarakctl ./cmd/tarakctl
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/taraktl ./cmd/taraktl
 
 # ─── Test ─────────────────────────────────────────────────────────────────────
 

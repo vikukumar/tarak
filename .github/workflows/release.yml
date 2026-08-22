@@ -193,19 +193,25 @@ jobs:
             fi
 
             TARAK_BIN="dist/${GOOS}_${GOARCH}/tarak${BIN_EXT}"
+            TARAKD_BIN="dist/${GOOS}_${GOARCH}/tarakd${BIN_EXT}"
+            TARAKS_BIN="dist/${GOOS}_${GOARCH}/taraks${BIN_EXT}"
             TARAKCTL_BIN="dist/${GOOS}_${GOARCH}/tarakctl${BIN_EXT}"
+            TARAKTL_BIN="dist/${GOOS}_${GOARCH}/taraktl${BIN_EXT}"
 
             mkdir -p "dist/${GOOS}_${GOARCH}"
 
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAK_BIN" ./cmd/tarak
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAKD_BIN" ./cmd/tarakd
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAKS_BIN" ./cmd/taraks
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAKCTL_BIN" ./cmd/tarakctl
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAKTL_BIN" ./cmd/taraktl
 
             # Package into Release Archive
             ARCHIVE_NAME="tarak_${NEW_VER}_${GOOS}_${GOARCH}"
             if [ "$GOOS" = "windows" ]; then
-              (cd "dist/${GOOS}_${GOARCH}" && zip -q "../../dist/archives/${ARCHIVE_NAME}.zip" "tarak${BIN_EXT}" "tarakctl${BIN_EXT}")
+              (cd "dist/${GOOS}_${GOARCH}" && zip -q "../../dist/archives/${ARCHIVE_NAME}.zip" "tarak${BIN_EXT}" "tarakd${BIN_EXT}" "taraks${BIN_EXT}" "tarakctl${BIN_EXT}" "taraktl${BIN_EXT}")
             else
-              tar -czf "dist/archives/${ARCHIVE_NAME}.tar.gz" -C "dist/${GOOS}_${GOARCH}" "tarak${BIN_EXT}" "tarakctl${BIN_EXT}"
+              tar -czf "dist/archives/${ARCHIVE_NAME}.tar.gz" -C "dist/${GOOS}_${GOARCH}" "tarak${BIN_EXT}" "tarakd${BIN_EXT}" "taraks${BIN_EXT}" "tarakctl${BIN_EXT}" "taraktl${BIN_EXT}"
             fi
           done
 
@@ -239,6 +245,11 @@ jobs:
           - **Release Type**: `${{ env.REASON }}`
           - **Commit**: `${{ env.GIT_SHA }}`
           - **Build Date**: `${{ env.BUILD_DATE }}`
+          - **Included Binaries**:
+            - ⚡ `tarak`: All-in-one unified server, agent & CLI runtime
+            - 🖥️ `tarakd`: Dedicated API server & control plane daemon
+            - 🤖 `taraks`: Dedicated worker node agent daemon
+            - 🎮 `tarakctl` / `taraktl`: Kubernetes-compatible command-line control tool
           - **Zero External Dependencies**: Natively runs on Windows, Linux, and macOS without Docker Desktop, WSL, or Podman.
 
           ---
