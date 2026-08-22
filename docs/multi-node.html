@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Node Clusters — Tarak Documentation</title>
+  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <a href="index.html" class="logo-container">
+      <img src="assets/tarak_icon.jpg" alt="Tarak Icon">
+      <span>TARAK</span>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="multi-node.html" class="active">Multi-Node</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="cli-reference.html">CLI Reference</a>
+      <a href="releases.html">Releases & Changelog</a>
+      <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank">⭐ GitHub</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div style="margin-bottom: 2.5rem;">
+      <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">🌐 Multi-Node Clustering Guide</h1>
+      <p style="color: var(--text-secondary);">Deploy a distributed cluster with separated Control Plane nodes and N Worker Nodes across different physical or virtual servers.</p>
+    </div>
+
+    <!-- Cluster Architecture Overview -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">1. Architecture Overview</h2>
+      <p style="margin-bottom: 1rem;">
+        In a multi-node Tarak cluster, nodes have distinct specialized roles:
+      </p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+        <div style="background: rgba(0,0,0,0.3); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+          <h3 style="color: var(--accent-cyan);">🖥️ Control Plane Node (<code>tarakd</code>)</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+            Runs the central API Server, Raft / BoltDB state store, admission webhooks, and controller manager (Deployments, Services, MetalLB, and Pod placement).
+          </p>
+        </div>
+        <div style="background: rgba(0,0,0,0.3); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+          <h3 style="color: var(--accent-purple);">🤖 Worker Nodes (<code>taraks</code>)</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+            Runs the lightweight TCR container execution runtime, manages local container processes and rootfs caches, and streams telemetry metrics.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1: Control Plane Setup -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">2. Starting the Control Plane Node</h2>
+      <p style="margin-bottom: 1rem;">
+        On your primary server (e.g. IP <code>192.168.1.100</code>), initialize PKI and start the control plane:
+      </p>
+      <div style="background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.9rem; margin: 0.5rem 0;">
+        # Initialize cluster PKI with the server's public/LAN IP in SANs<br>
+        tarak init --bind-address 0.0.0.0:6443 --tls-san 192.168.1.100,localhost<br><br>
+        # Start the control plane API server<br>
+        tarakd server --bind-address 0.0.0.0:6443 --data-dir /var/lib/tarak
+      </div>
+    </div>
+
+    <!-- Step 2: Joining Worker Nodes -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">3. Joining Worker Nodes</h2>
+      <p style="margin-bottom: 1rem;">
+        On each worker machine (Linux, Windows, or macOS), run the dedicated worker agent:
+      </p>
+      <div style="background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.9rem; margin: 0.5rem 0;">
+        # Start worker agent and connect to the control plane<br>
+        taraks agent --server https://192.168.1.100:6443 --node-name worker-node-1
+      </div>
+    </div>
+
+    <!-- Step 3: Verifying the Cluster -->
+    <div class="card">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">4. Inspecting Cluster Nodes & Metrics</h2>
+      <p style="margin-bottom: 1rem;">
+        From your administrator laptop using <code>tarakctl</code>:
+      </p>
+      <div style="background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.9rem; margin: 0.5rem 0;">
+        # List all cluster nodes with OS, Arch, and status<br>
+        tarakctl get nodes -o wide<br><br>
+        # View real-time CPU & Memory utilization across nodes<br>
+        tarakctl top nodes
+      </div>
+      <p style="margin-top: 1rem; color: var(--text-secondary);">
+        Workloads deployed via <code>tarakctl apply -f</code> will automatically be scheduled and balanced across your active worker nodes!
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <p>© 2026 Tarak Authors. Released under the MIT License.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
