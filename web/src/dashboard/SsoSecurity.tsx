@@ -186,6 +186,31 @@ export const SsoSecurity: React.FC<Props> = ({ onToast }) => {
           ))}
         </div>
       </div>
+
+      {/* Remote CLI Access & Login Guide */}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <h3 style={{ color: '#fff', fontSize: '1.15rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Lock size={18} color="var(--accent-cyan)" /> Remote CLI Access (`tarakctl login`)
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+          By default, <code>tarakctl</code> running on the same host connects as <b>Super-Admin</b> via local mTLS. For remote team members, authenticate directly via credentials or SSO:
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="code-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+            <span>tarakctl login https://cluster.vikshro.in:8443 --username alice --password *****</span>
+            <button onClick={() => { navigator.clipboard.writeText('tarakctl login https://cluster.vikshro.in:8443 --username alice'); onToast('Command copied!'); }} style={{ background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: 600 }}>Copy</button>
+          </div>
+          <div className="code-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+            <span>tarakctl login https://cluster.vikshro.in:8443 --sso github</span>
+            <button onClick={() => { navigator.clipboard.writeText('tarakctl login https://cluster.vikshro.in:8443 --sso github'); onToast('Command copied!'); }} style={{ background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: 600 }}>Copy</button>
+          </div>
+          <div className="code-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+            <span>taraktl get pods -A</span>
+            <button onClick={() => { navigator.clipboard.writeText('taraktl get pods -A'); onToast('Command copied!'); }} style={{ background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: 600 }}>Copy</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

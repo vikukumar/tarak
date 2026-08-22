@@ -122,8 +122,9 @@ and administering Tarak clusters with full Kubernetes compatibility.`,
 	root.AddCommand(newClusterInfoCmd())
 	root.AddCommand(newVersionCmd())
 
-	// Configuration
+	// Configuration & Authentication
 	root.AddCommand(newConfigCmd())
+	root.AddCommand(newLoginCmd())
 
 	return root
 }
@@ -3836,4 +3837,133 @@ func newTunnelCmd() *cobra.Command {
 
 	return cmd
 }
+
+// ─── login ────────────────────────────────────────────────────────────────────
+
+func newLoginCmd() *cobra.Command {
+	var (
+		username string
+		password string
+		token    string
+		sso      string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "login <server-url>",
+		Short: "Authenticate to a remote Tarak cluster and configure local credentials & RBAC profile",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			serverURL := args[0]
+			if !strings.HasPrefix(serverURL, "http://") && !strings.HasPrefix(serverURL, "https://") {
+				serverURL = "https://" + serverURL
+			}
+
+			tok := token
+			var userProfile struct {
+				Username string   `json:"username"`
+				Provider string   `json:"provider"`
+				Roles    []string `json:"roles"`
+				Groups   []string `json:"groups"`
+			}
+
+			if tok == "" {
+				if username == "" {
+					username = "admin"
+				}
+				if password == "" {
+					password = "password"
+				}
+
+				loginURL := strings.TrimRight(serverURL, "/") + "/apis/auth.tarak.io/v1/login"
+				bodyData, _ := json.Marshal(map[string]string{
+					"username": username,
+					"password": password,
+					"provider": sso,
+				})
+
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				client := &http.Client{Transport: tr, Timeout: 10 * time.Second}
+
+				resp, err := client.Post(loginURL, "application/json", bytes.NewReader(bodyData))
+				if err != nil {
+					return fmt.Errorf("connect to cluster %s: %w", serverURL, err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusOK {
+					b, _ := io.ReadAll(resp.Body)
+					return fmt.Errorf("authentication failed (HTTP %d): %s", resp.StatusCode, string(b))
+				}
+
+				var loginResp struct {
+					Token string `json:"token"`
+					User  struct {
+						Username string   `json:"username"`
+						Provider string   `json:"provider"`
+						Roles    []string `json:"roles"`
+						Groups   []string `json:"groups"`
+					} `json:"user"`
+				}
+				if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+					return fmt.Errorf("decode auth response: %w", err)
+				}
+
+				tok = loginResp.Token
+				userProfile = loginResp.User
+				fmt.Printf("✓ Successfully authenticated to %s as @%s (%s)\n", serverURL, userProfile.Username, userProfile.Provider)
+				fmt.Printf("  Assigned RBAC Roles : %v\n", userProfile.Roles)
+				fmt.Printf("  Assigned Groups     : %v\n", userProfile.Groups)
+			}
+
+			kcPath := globals.Kubeconfig
+			if kcPath == "" {
+				home, err := os.UserHomeDir()
+				if err == nil {
+					kcPath = filepath.Join(home, ".tarak", "config")
+				} else {
+					kcPath = "./kubeconfig.yaml"
+				}
+			}
+
+			kcData := fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- name: tarak-remote
+  cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+contexts:
+- name: default
+  context:
+    cluster: tarak-remote
+    user: remote-user
+    namespace: default
+current-context: default
+users:
+- name: remote-user
+  user:
+    token: %s
+`, serverURL, tok)
+
+			_ = os.MkdirAll(filepath.Dir(kcPath), 0755)
+			if err := os.WriteFile(kcPath, []byte(kcData), 0600); err != nil {
+				return fmt.Errorf("save config to %s: %w", kcPath, err)
+			}
+
+			fmt.Printf("✓ Configured cluster context at %s\n", kcPath)
+			fmt.Println("  Ready to execute commands via tarakctl!")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&username, "username", "u", "", "Username for authentication")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "Password for authentication")
+	cmd.Flags().StringVar(&token, "token", "", "Direct bearer or API token")
+	cmd.Flags().StringVar(&sso, "sso", "local", "SSO provider (e.g. github, google, okta, keycloak)")
+
+	return cmd
+}
+
 

@@ -420,6 +420,17 @@ func (s *Server) Run(ctx context.Context) error {
 		zap.Bool("insecureAuth", s.cfg.AllowInsecureAuth),
 	)
 
+	fmt.Printf("\n"+
+		"╔══════════════════════════════════════════════════════════════════════════════════╗\n"+
+		"║  🚀 TARAK CONTAINER ORCHESTRATION PLATFORM (%s)                               ║\n"+
+		"╠══════════════════════════════════════════════════════════════════════════════════╣\n"+
+		"║  🌐 Inbuilt Cluster Dashboard : https://%s/dashboard/\n"+
+		"║  ⚡ HTTP Ingress Proxy        : http://%s/\n"+
+		"║  🔑 Local Access Mode         : Super-Admin (mTLS & Master Token Active)         ║\n"+
+		"║  🛡️ Remote Access Command     : tarakctl login https://%s\n"+
+		"╚══════════════════════════════════════════════════════════════════════════════════╝\n\n",
+		version.String(), s.cfg.BindAddress, s.cfg.IngressHTTPAddress, s.cfg.BindAddress)
+
 	// ── Controller Manager ───────────────────────────────────────────────
 	ctrlMgr := controller.NewManager(s.store, s.runtime, s.log)
 	ctrlMgr.SetIngressReconciler(func(c context.Context) {
