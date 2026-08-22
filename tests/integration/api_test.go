@@ -62,6 +62,9 @@ func startTestServer(t *testing.T) *testServer {
 		Log:               log,
 	}
 
+	testPort := "18443"
+	cfg.BindAddress = "127.0.0.1:" + testPort
+
 	srv, err := server.New(cfg)
 	require.NoError(t, err)
 
@@ -69,14 +72,6 @@ func startTestServer(t *testing.T) *testServer {
 	t.Cleanup(func() {
 		cancel()
 	})
-
-	// The server needs a fixed port for the test. Use a fixed random-looking port.
-	// In production, ports are bound by the OS. For tests, we use a fixed address.
-	testPort := "18443"
-	cfg.BindAddress = "127.0.0.1:" + testPort
-
-	srv, err = server.New(cfg)
-	require.NoError(t, err)
 
 	started := make(chan struct{})
 	go func() {
@@ -90,8 +85,14 @@ func startTestServer(t *testing.T) *testServer {
 
 	// Wait for server to be ready.
 	baseURL := "https://127.0.0.1:" + testPort
+	probeClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		},
+		Timeout: 2 * time.Second,
+	}
 	require.Eventually(t, func() bool {
-		resp, err := http.Get(baseURL + "/healthz") //nolint:gosec
+		resp, err := probeClient.Get(baseURL + "/healthz")
 		if err != nil {
 			return false
 		}
