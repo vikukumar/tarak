@@ -8,7 +8,21 @@
 
 ![Go](https://img.shields.io/badge/go-1.22+-00ADD8.svg?style=flat-square&logo=go)
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-lightgrey?style=flat-square)
+![Architecture](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-blueviolet?style=flat-square)
+![Release](https://img.shields.io/github/v/release/vikukumar/tarak?style=flat-square&color=success)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
+
+## ⚡ Quick Installation
+
+### Linux & macOS (One-Line Install)
+```bash
+curl -fsSL https://raw.githubusercontent.com/vikukumar/tarak/main/install.sh | bash
+```
+
+### Windows (PowerShell One-Line Install)
+```powershell
+irm https://raw.githubusercontent.com/vikukumar/tarak/main/install.ps1 | iex
+```
 
 ## 🚀 Features
 
