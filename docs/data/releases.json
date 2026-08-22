@@ -1,0 +1,40 @@
+[
+  {
+    "version": "1.0.1",
+    "tag": "v1.0.1",
+    "date": "2026-08-23",
+    "name": "Tarak v1.0.1 — Multi-Node Clustering & Public Go SDK",
+    "highlights": [
+      "Added multi-node clustering: separate Control Plane (tarakd) and Worker Node (taraks) daemons",
+      "Released public Go client SDK (pkg/client) and runtime primitives (pkg/tcr)",
+      "Published complete documentation portal with live changelog at tarak.vikshro.in",
+      "Fixed 1:1 brand icon synchronization and automated cross-platform build matrix",
+      "Native OCI layer extraction and zero-WSL container isolation on Windows, Linux, and macOS"
+    ],
+    "binaries": [
+      "tarak (All-in-One Unified Binary)",
+      "tarakd (Dedicated API Server Daemon)",
+      "taraks (Dedicated Worker Node Daemon)",
+      "tarakctl / taraktl (Kubernetes-Compatible CLI Tool)"
+    ],
+    "platforms": ["linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64", "darwin/amd64", "darwin/arm64"]
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "date": "2026-08-19",
+    "name": "Tarak v1.0.0 — Initial Production Release",
+    "highlights": [
+      "Built-from-scratch zero-dependency container orchestration engine",
+      "Kubernetes API compliance with standard Core v1 and Apps v1 resources",
+      "Sub-25 MB idle RAM footprint and sub-180ms instant cold-start time",
+      "Integrated Virtual Pod Bridge networking with ClusterIP and MetalLB support",
+      "Mutual TLS (mTLS) authentication with built-in P-256 ECDSA Certificate Authority"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl"
+    ],
+    "platforms": ["linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64", "darwin/amd64", "darwin/arm64"]
+  }
+]

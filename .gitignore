@@ -16,9 +16,11 @@ coverage.out
 coverage.html
 profile.out
 
-# Runtime data & Local Cluster state
-data/
-cert/
+# Runtime data & Local Cluster state (root only)
+/data/
+/cert/
+!docs/data/
+!docs/data/**
 *.key
 *.pem
 *.crt
