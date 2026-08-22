@@ -16,14 +16,15 @@
 
 # ─── Build settings ──────────────────────────────────────────────────────────
 
-VERSION     := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+VERSION     := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0")
+COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 DATE        := $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
 MODULE      := github.com/vikukumar/tarak
 LDFLAGS     := -s -w \
-               -X main.version=$(VERSION) \
-               -X main.commit=$(COMMIT) \
-               -X main.date=$(DATE)
+               -X $(MODULE)/internal/version.Version=$(VERSION) \
+               -X $(MODULE)/internal/version.Commit=$(COMMIT) \
+               -X $(MODULE)/internal/version.BuildDate=$(DATE) \
+               -X $(MODULE)/internal/version.Author=vikukumar
 
 BIN_DIR     := bin
 

@@ -1,0 +1,319 @@
+name: Release & Version Management
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'assets/**'
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version Bump Type'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Custom version override (e.g. 1.2.0, optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Build, Bump Version & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      # ─── 1. Determine SemVer Version ─────────────────────────────────────────
+      - name: Calculate Next Version & Sync Codebase
+        id: semver
+        run: |
+          set -e
+
+          # Fetch all tags
+          git fetch --tags --force || true
+
+          # Read current version from internal/version/version.go or latest git tag
+          CURRENT_FILE_VER=$(grep -E 'Version\s*=\s*"[^"]+"' internal/version/version.go | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.0.0")
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v$CURRENT_FILE_VER")
+          CLEAN_TAG=${LATEST_TAG#v}
+
+          echo "Latest tag found: $LATEST_TAG (clean: $CLEAN_TAG)"
+          echo "File version: $CURRENT_FILE_VER"
+
+          # Parse Major.Minor.Patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CLEAN_TAG"
+          MAJOR=${MAJOR:-1}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+
+          # Handle bump type
+          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+          CUSTOM_VER="${{ github.event.inputs.custom_version }}"
+
+          if [ -n "$CUSTOM_VER" ]; then
+            NEW_VER="${CUSTOM_VER#v}"
+            BUMP_REASON="Manual custom version"
+          elif [ "$BUMP_TYPE" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            NEW_VER="$MAJOR.$MINOR.$PATCH"
+            BUMP_REASON="Manual major bump"
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            NEW_VER="$MAJOR.$MINOR.$PATCH"
+            BUMP_REASON="Manual minor bump"
+          elif [ "$BUMP_TYPE" = "patch" ]; then
+            PATCH=$((PATCH + 1))
+            NEW_VER="$MAJOR.$MINOR.$PATCH"
+            BUMP_REASON="Manual patch bump"
+          else
+            # Automated detection based on git commit history since last tag
+            COMMITS_LOG=$(git log "$LATEST_TAG"..HEAD --oneline 2>/dev/null || git log -n 10 --oneline)
+            echo "Commits since last tag:"
+            echo "$COMMITS_LOG"
+
+            if echo "$COMMITS_LOG" | grep -Ei 'BREAKING CHANGE:|breaking:|^major:|\(major\):|\[major\]'; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              NEW_VER="$MAJOR.$MINOR.$PATCH"
+              BUMP_REASON="Breaking change detected (major)"
+            elif echo "$COMMITS_LOG" | grep -Ei '^feat|^feat\(|\[minor\]|minor:'; then
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              NEW_VER="$MAJOR.$MINOR.$PATCH"
+              BUMP_REASON="Feature detected (minor)"
+            else
+              PATCH=$((PATCH + 1))
+              NEW_VER="$MAJOR.$MINOR.$PATCH"
+              BUMP_REASON="Fix/Patch detected (patch)"
+            fi
+          fi
+
+          NEW_TAG="v$NEW_VER"
+          echo "Computed new version: $NEW_VER ($NEW_TAG) - Reason: $BUMP_REASON"
+
+          # Sync version into internal/version/version.go
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          GIT_SHA=$(git rev-parse --short HEAD)
+
+          sed -i -E "s/Version = \"[^\"]+\"/Version = \"$NEW_VER\"/" internal/version/version.go
+          sed -i -E "s/Commit = \"[^\"]+\"/Commit = \"$GIT_SHA\"/" internal/version/version.go
+          sed -i -E "s/BuildDate = \"[^\"]+\"/BuildDate = \"$BUILD_DATE\"/" internal/version/version.go
+
+          echo "Updated internal/version/version.go:"
+          cat internal/version/version.go
+
+          # Configure Git and commit version bump if changed
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --quiet internal/version/version.go; then
+            git add internal/version/version.go
+            git commit -m "chore(release): bump version to $NEW_TAG [skip ci]"
+            git push origin HEAD:${{ github.ref_name }} || echo "Push skipped or branch protected"
+          fi
+
+          # Tag the release
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG - $BUMP_REASON"
+          git push origin "$NEW_TAG" --force || true
+
+          # Set outputs
+          echo "version=$NEW_VER" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$GIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
+          echo "reason=$BUMP_REASON" >> "$GITHUB_OUTPUT"
+
+      # ─── 2. Cross-Platform Build Matrix (Zero Action Storage) ────────────────
+      - name: Build All Binaries for Linux, Windows & macOS (AMD64 & ARM64)
+        env:
+          NEW_VER: ${{ steps.semver.outputs.version }}
+          NEW_TAG: ${{ steps.semver.outputs.tag }}
+          GIT_SHA: ${{ steps.semver.outputs.commit }}
+          BUILD_DATE: ${{ steps.semver.outputs.date }}
+        run: |
+          set -e
+
+          mkdir -p dist dist/archives
+          MODULE="github.com/vikukumar/tarak"
+          LDFLAGS="-s -w \
+            -X ${MODULE}/internal/version.Version=${NEW_VER} \
+            -X ${MODULE}/internal/version.Commit=${GIT_SHA} \
+            -X ${MODULE}/internal/version.BuildDate=${BUILD_DATE} \
+            -X ${MODULE}/internal/version.Author=vikukumar"
+
+          PLATFORMS=(
+            "linux/amd64"
+            "linux/arm64"
+            "windows/amd64"
+            "windows/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+          )
+
+          echo "=============================================="
+          echo "Building Tarak $NEW_TAG across all platforms..."
+          echo "=============================================="
+
+          for PLATFORM in "${PLATFORMS[@]}"; do
+            IFS='/' read -r GOOS GOARCH <<< "$PLATFORM"
+            echo "--> Compiling for $GOOS/$GOARCH..."
+
+            BIN_EXT=""
+            if [ "$GOOS" = "windows" ]; then
+              BIN_EXT=".exe"
+            fi
+
+            TARAK_BIN="dist/${GOOS}_${GOARCH}/tarak${BIN_EXT}"
+            TARAKCTL_BIN="dist/${GOOS}_${GOARCH}/tarakctl${BIN_EXT}"
+
+            mkdir -p "dist/${GOOS}_${GOARCH}"
+
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAK_BIN" ./cmd/tarak
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -trimpath -o "$TARAKCTL_BIN" ./cmd/tarakctl
+
+            # Package into Release Archive
+            ARCHIVE_NAME="tarak_${NEW_VER}_${GOOS}_${GOARCH}"
+            if [ "$GOOS" = "windows" ]; then
+              (cd "dist/${GOOS}_${GOARCH}" && zip -q "../../dist/archives/${ARCHIVE_NAME}.zip" "tarak${BIN_EXT}" "tarakctl${BIN_EXT}")
+            else
+              tar -czf "dist/archives/${ARCHIVE_NAME}.tar.gz" -C "dist/${GOOS}_${GOARCH}" "tarak${BIN_EXT}" "tarakctl${BIN_EXT}"
+            fi
+          done
+
+          echo "=============================================="
+          echo "Generating Checksums..."
+          echo "=============================================="
+          cd dist/archives
+          sha256sum * > checksums.txt
+          cat checksums.txt
+          cd ../..
+
+      # ─── 3. Generate Beautiful Release Documentation ────────────────────────
+      - name: Generate Release Notes
+        env:
+          NEW_VER: ${{ steps.semver.outputs.version }}
+          NEW_TAG: ${{ steps.semver.outputs.tag }}
+          REASON: ${{ steps.semver.outputs.reason }}
+          GIT_SHA: ${{ steps.semver.outputs.commit }}
+          BUILD_DATE: ${{ steps.semver.outputs.date }}
+        run: |
+          cat << 'EOF' > dist/RELEASE_NOTES.md
+          <p align="center">
+            <h1 align="center">⚡ Tarak ${{ env.NEW_TAG }}</h1>
+            <p align="center"><b>Next-Generation, Native Kubernetes Alternative for All Platforms</b></p>
+          </p>
+
+          ---
+
+          ### 🚀 Release Highlights
+          - **Version**: `${{ env.NEW_VER }}` (`${{ env.NEW_TAG }}`)
+          - **Release Type**: `${{ env.REASON }}`
+          - **Commit**: `${{ env.GIT_SHA }}`
+          - **Build Date**: `${{ env.BUILD_DATE }}`
+          - **Zero External Dependencies**: Natively runs on Windows, Linux, and macOS without Docker Desktop, WSL, or Podman.
+
+          ---
+
+          ### 📦 Quick Installation
+
+          #### 🐧 Linux & 🍎 macOS (One-Line Install)
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+          ```
+          *Or manually extract and add to your PATH:*
+          ```bash
+          # Example for Linux AMD64
+          curl -LO https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_linux_amd64.tar.gz
+          tar -xzf tarak_${{ env.NEW_VER }}_linux_amd64.tar.gz
+          sudo mv tarak tarakctl /usr/local/bin/
+          ```
+
+          #### 🪟 Windows (PowerShell One-Line Install)
+          ```powershell
+          # Download and extract automatically
+          $ver = "${{ env.NEW_VER }}"
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v$ver/tarak_${ver}_windows_amd64.zip" -OutFile "tarak.zip"
+          Expand-Archive -Path "tarak.zip" -DestinationPath "$env:ProgramFiles\Tarak" -Force
+          [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:ProgramFiles\Tarak", [EnvironmentVariableTarget]::Machine)
+          ```
+
+          ---
+
+          ### 📊 Platform & Binary Matrix
+
+          | OS | Architecture | Package Archive | Description |
+          |---|---|---|---|
+          | **Linux** | `amd64` (x86_64) | [`tarak_${{ env.NEW_VER }}_linux_amd64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_linux_amd64.tar.gz) | Standard 64-bit Linux Servers & Desktops |
+          | **Linux** | `arm64` (aarch64) | [`tarak_${{ env.NEW_VER }}_linux_arm64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_linux_arm64.tar.gz) | ARM Linux (Raspberry Pi 4/5, AWS Graviton) |
+          | **Windows** | `amd64` (x86_64) | [`tarak_${{ env.NEW_VER }}_windows_amd64.zip`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_windows_amd64.zip) | Windows 10/11 & Windows Server (64-bit) |
+          | **Windows** | `arm64` | [`tarak_${{ env.NEW_VER }}_windows_arm64.zip`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_windows_arm64.zip) | Windows on ARM (Surface Pro, Snapdragon X) |
+          | **macOS** | `arm64` (Apple Silicon) | [`tarak_${{ env.NEW_VER }}_darwin_arm64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_darwin_arm64.tar.gz) | Apple M1/M2/M3/M4 Macs |
+          | **macOS** | `amd64` (Intel) | [`tarak_${{ env.NEW_VER }}_darwin_amd64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.NEW_TAG }}/tarak_${{ env.NEW_VER }}_darwin_amd64.tar.gz) | Intel-based Macs |
+
+          ---
+
+          ### 🛡️ Verification & Integrity
+          Verify the integrity of downloaded binaries using the official checksums:
+          ```bash
+          # Verify checksums
+          sha256sum -c checksums.txt
+          ```
+
+          ---
+
+          ### ⚡ Getting Started
+          ```bash
+          # 1. Start the Tarak Server & Native Runtime
+          tarak server
+
+          # 2. Deploy your workloads
+          tarakctl apply -f app-sample.yml
+
+          # 3. View running pods & services
+          tarakctl get all -A -o wide
+          ```
+          EOF
+
+      # ─── 4. Publish GitHub Release (Direct Upload, Zero Action Storage) ──────
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.semver.outputs.tag }}
+          NEW_VER: ${{ steps.semver.outputs.version }}
+        run: |
+          echo "Publishing GitHub release $NEW_TAG..."
+
+          gh release create "$NEW_TAG" \
+            dist/archives/* \
+            --title "Tarak $NEW_TAG" \
+            --notes-file dist/RELEASE_NOTES.md \
+            --latest
