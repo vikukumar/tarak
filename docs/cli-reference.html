@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CLI Reference — Tarak Documentation</title>
-  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
+  <title>CLI Reference — TARAK Documentation</title>
+  <meta name="description" content="Complete command-line reference for tarakctl and taraktl CLI tools.">
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
 </head>
 <body>
 
-  <!-- Navigation Header -->
   <header>
     <a href="index.html" class="logo-container">
       <img src="assets/tarak_icon.jpg" alt="Tarak Icon">
-      <span>TARAK</span>
+      <span class="logo-text-gradient">TARAK</span>
     </a>
-    <nav>
+    
+    <nav class="desktop-nav">
       <a href="index.html">Home</a>
       <a href="getting-started.html">Getting Started</a>
       <a href="multi-node.html">Multi-Node</a>
@@ -26,104 +27,84 @@
       <a href="releases.html">Releases & Changelog</a>
       <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank">⭐ GitHub</a>
     </nav>
+
+    <button class="mobile-toggle" aria-label="Toggle navigation menu">☰</button>
   </header>
 
+  <div class="drawer-backdrop"></div>
+  <aside class="mobile-drawer">
+    <a href="index.html">🏠 Home</a>
+    <a href="getting-started.html">🚀 Getting Started</a>
+    <a href="multi-node.html">🌐 Multi-Node Clustering</a>
+    <a href="tunnels.html">⚡ Tunnels & Ingress</a>
+    <a href="architecture.html">📐 Architecture</a>
+    <a href="api-reference.html">📡 API Reference</a>
+    <a href="cli-reference.html" class="active">💻 CLI Reference</a>
+    <a href="releases.html">📦 Releases & Changelog</a>
+    <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank" style="margin-top: 1rem;">⭐ Star on GitHub</a>
+  </aside>
+
   <main class="container">
-    <div style="margin-bottom: 2.5rem;">
-      <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">💻 CLI Reference Guide</h1>
-      <p style="color: var(--text-secondary);">Complete command-line reference for <code>tarakctl</code> (and <code>tarak</code>).</p>
+    <div style="text-align: center; margin-bottom: 3.5rem;">
+      <span class="badge badge-purple" style="margin-bottom: 1rem;">CLI & Command Suite</span>
+      <h1 style="font-size: clamp(2.2rem, 4vw, 3rem); font-weight: 800; color: #fff; margin-bottom: 1rem;">
+        CLI <span class="hero-gradient-text">Reference</span>
+      </h1>
+      <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto;">
+        Command-line syntax and usage guide for <code>tarakctl</code> (or alias <code>taraktl</code>).
+      </p>
     </div>
 
-    <!-- Commands Table -->
     <div class="card" style="margin-bottom: 2rem;">
-      <h2>Core Commands</h2>
-      <table class="benchmark-table" style="margin-top: 1rem;">
-        <thead>
-          <tr>
-            <th>Command</th>
-            <th>Description</th>
-            <th>Example</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>apply -f &lt;file&gt;</code></td>
-            <td>Create or update resources from a YAML manifest</td>
-            <td><code>tarakctl apply -f app-sample.yml</code></td>
-          </tr>
-          <tr>
-            <td><code>get &lt;resource&gt;</code></td>
-            <td>List pods, services, deployments, nodes, or CRDs</td>
-            <td><code>tarakctl get all -A -o wide</code></td>
-          </tr>
-          <tr>
-            <td><code>describe &lt;type&gt; &lt;name&gt;</code></td>
-            <td>Show detailed metadata and lifecycle events</td>
-            <td><code>tarakctl describe pod/web-app -n demo</code></td>
-          </tr>
-          <tr>
-            <td><code>port-forward &lt;pod&gt; &lt;local:remote&gt;</code></td>
-            <td>Forward a local port to a container port</td>
-            <td><code>tarakctl port-forward pod/web 8080:80</code></td>
-          </tr>
-          <tr>
-            <td><code>logs &lt;pod&gt;</code></td>
-            <td>Stream container output logs</td>
-            <td><code>tarakctl logs pod/web -f</code></td>
-          </tr>
-          <tr>
-            <td><code>exec &lt;pod&gt; -- &lt;cmd&gt;</code></td>
-            <td>Execute a command inside a running container</td>
-            <td><code>tarakctl exec pod/web -it -- /bin/sh</code></td>
-          </tr>
-          <tr>
-            <td><code>top &lt;pods/nodes&gt;</code></td>
-            <td>Display live CPU and memory utilization</td>
-            <td><code>tarakctl top pods -n demo</code></td>
-          </tr>
-          <tr>
-            <td><code>version</code></td>
-            <td>Display client and server version information</td>
-            <td><code>tarakctl version</code></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Server & Runtime Commands -->
-    <div class="card">
-      <h2>Server & Node Commands</h2>
-      <table class="benchmark-table" style="margin-top: 1rem;">
-        <thead>
-          <tr>
-            <th>Command</th>
-            <th>Description</th>
-            <th>Example</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>tarak init</code></td>
-            <td>Bootstrap cluster PKI, state store, and admin kubeconfig</td>
-            <td><code>tarak init --data-dir ~/.tarak/data</code></td>
-          </tr>
-          <tr>
-            <td><code>tarak server</code></td>
-            <td>Start the unified API server and container engine</td>
-            <td><code>tarak server --bind-address 0.0.0.0:6443</code></td>
-          </tr>
-          <tr>
-            <td><code>tarak agent</code></td>
-            <td>Start the dedicated worker runtime node</td>
-            <td><code>tarak agent --server https://cluster:6443</code></td>
-          </tr>
-        </tbody>
-      </table>
+      <h2 style="color: #fff; margin-bottom: 1rem; font-size: 1.35rem;">💻 Core Cluster Commands</h2>
+      <div class="table-responsive">
+        <table class="benchmark-table">
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Aliases</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>tarakctl get pods</code></td>
+              <td><code>po</code></td>
+              <td>List all pods across namespaces</td>
+            </tr>
+            <tr>
+              <td><code>tarakctl get nodes</code></td>
+              <td><code>no</code></td>
+              <td>List all cluster control plane & worker nodes</td>
+            </tr>
+            <tr>
+              <td><code>tarakctl apply -f &lt;file&gt;</code></td>
+              <td>—</td>
+              <td>Create or update resources declaratively from YAML</td>
+            </tr>
+            <tr>
+              <td><code>tarakctl tunnel list</code></td>
+              <td><code>tunnels, tun ls</code></td>
+              <td>List live Cloudflare and Tailscale tunnel endpoints</td>
+            </tr>
+            <tr>
+              <td><code>tarakctl logs &lt;pod&gt;</code></td>
+              <td>—</td>
+              <td>Stream real-time logs from a container pod</td>
+            </tr>
+            <tr>
+              <td><code>tarakctl delete &lt;kind&gt; &lt;name&gt;</code></td>
+              <td>—</td>
+              <td>Delete a cluster resource</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 
   <footer>
-    <p>© 2026 Tarak Authors. Released under the MIT License.</p>
+    <p>© 2026 TARAK Container Orchestration Platform. Open source under Apache 2.0.</p>
   </footer>
 
   <script src="app.js"></script>
