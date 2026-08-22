@@ -14,8 +14,11 @@ const (
 // ContainerConfig holds container launch configuration.
 type ContainerConfig = tcr.ContainerConfig
 
-// ProcessState represents a running container process.
-type ProcessState = tcr.ProcessState
+// ExecConfig specifies a command to run inside an existing container.
+type ExecConfig = tcr.ExecConfig
+
+// Process tracks a running container process.
+type Process = tcr.Process
 
 // RunContainerInit invokes the native container init sequence.
 func RunContainerInit() error {
