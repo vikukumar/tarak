@@ -133,7 +133,7 @@ func newAgentCommand() *cobra.Command {
 				case <-ticker.C:
 					sys := runtime.SampleSystemMetrics()
 					log.Debug("node metrics sampled",
-						zap.Int("cpuMillicores", sys.CPUMillicores),
+						zap.Int("cpuMillicores", int(sys.CPUMillicores)),
 						zap.Float64("cpuPercent", sys.CPUPercent),
 						zap.Uint64("memoryUsed", sys.UsedMemoryBytes),
 					)

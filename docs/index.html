@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tarak — Lightning-Fast Native Container Orchestration</title>
+  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <a href="index.html" class="logo-container">
+      <img src="assets/tarak_icon.jpg" alt="Tarak Icon">
+      <span>TARAK</span>
+    </a>
+    <nav>
+      <a href="index.html" class="active">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="cli-reference.html">CLI Reference</a>
+      <a href="releases.html">Releases & Changelog</a>
+      <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank">⭐ GitHub</a>
+    </nav>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="container">
+    <section class="hero">
+      <div class="hero-badge" id="release-badge">⚡ Loading latest release...</div>
+      <h1>Lighter, Faster Native<br>Container Orchestration</h1>
+      <p>
+        The zero-dependency alternative to Kubernetes and K3s. Run real OCI containers natively on Windows, Linux, and macOS without Docker Desktop, WSL, or heavy VMs.
+      </p>
+
+      <!-- Terminal Install Widget -->
+      <div class="terminal-box">
+        <div class="terminal-header">
+          <div class="terminal-tabs">
+            <button class="terminal-tab active" data-type="bash">Linux / macOS (Bash)</button>
+            <button class="terminal-tab" data-type="powershell">Windows (PowerShell)</button>
+            <button class="terminal-tab" data-type="go">Go SDK Package</button>
+          </div>
+          <button class="btn-copy" onclick="copyInstallCommand()">Copy</button>
+        </div>
+        <div class="terminal-body">
+          <span id="install-cmd">curl -fsSL https://raw.githubusercontent.com/vikukumar/tarak/main/install.sh | bash</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Benchmark Matrix vs K8s and K3s -->
+    <section class="benchmark-section">
+      <h2 style="text-align: center; margin-bottom: 0.5rem;">🚀 Benchmark vs Kubernetes & K3s</h2>
+      <p style="text-align: center; color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem;">
+        Engineered from first principles in pure Go to provide maximum throughput and instant cold starts.
+      </p>
+      <table class="benchmark-table">
+        <thead>
+          <tr>
+            <th>Feature / Metric</th>
+            <th>Tarak</th>
+            <th>K3s</th>
+            <th>Standard Kubernetes (K8s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Idle RAM Footprint</b></td>
+            <td><span class="badge-win">&lt; 25 MB</span></td>
+            <td>~500 MB</td>
+            <td>~1.2 GB+</td>
+          </tr>
+          <tr>
+            <td><b>Cold Start Time</b></td>
+            <td><span class="badge-win">&lt; 180 ms</span></td>
+            <td>10 – 20 sec</td>
+            <td>45 – 90 sec</td>
+          </tr>
+          <tr>
+            <td><b>Windows Native Isolation</b></td>
+            <td><span class="badge-win">Native (No WSL / Hyper-V required)</span></td>
+            <td>Requires WSL2</td>
+            <td>Requires Docker/WSL2</td>
+          </tr>
+          <tr>
+            <td><b>External Dependencies</b></td>
+            <td><span class="badge-win">0 (Standalone Binary)</span></td>
+            <td>containerd, runc</td>
+            <td>containerd/CRI-O, etcd, CNI</td>
+          </tr>
+          <tr>
+            <td><b>Kubernetes API Compatibility</b></td>
+            <td><span class="badge-win">100% Core K8s API Compliant</span></td>
+            <td>100% Compliant</td>
+            <td>Standard</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Key Feature Grid -->
+    <section class="grid">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Native OCI Extraction</h3>
+        <p>Directly downloads, caches, and unpacks OCI layers from Docker Hub to disk. No background daemon or socket bridge needed.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌐</div>
+        <h3>Virtual Pod Bridge</h3>
+        <p>High-performance virtual network namespaces providing isolated container IP addressing, port-forwarding, and load balancing.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <h3>All-in-One Binary</h3>
+        <p>Control plane API server, controller loops, worker node runtime, and CLI control tool bundled into a single zero-dependency binary.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3>Zero-Trust PKI Security</h3>
+        <p>Automated mutual TLS (mTLS) with internal Certificate Authority (CA) generation and native <code>TarakSecurityPolicy</code> enforcement.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💻</div>
+        <h3>Universal Cross-Platform</h3>
+        <p>Runs identically across Windows (AMD64/ARM64), Linux (AMD64/ARM64), and macOS (Apple Silicon / Intel).</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔌</div>
+        <h3>Reusable Go SDK</h3>
+        <p>Import <code>pkg/client</code> directly into your own Go programs to automate, orchestrate, and manage workloads programmatically.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>© 2026 Tarak Authors. Released under the MIT License.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
