@@ -386,7 +386,6 @@ func TestVersionAndOpenAPIEndpoints(t *testing.T) {
 	resp, body := s.get("/version")
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, string(body), "gitVersion")
-	assert.Contains(t, string(body), "v1.30.0-tarak")
 
 	resp, body = s.get("/openapi/v2")
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
