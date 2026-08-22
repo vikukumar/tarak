@@ -1,9 +1,19 @@
 name: Deploy Documentation to GitHub Pages
 
 on:
+  workflow_run:
+    workflows: ["Release & Version Management"]
+    types:
+      - completed
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+      - master
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
   release:
     types:
       - published
@@ -20,6 +30,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     environment: github-pages
     runs-on: ubuntu-latest
     steps:
