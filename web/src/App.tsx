@@ -10,6 +10,7 @@ import { Architecture } from './components/Architecture';
 import { ApiReference } from './components/ApiReference';
 import { CliReference } from './components/CliReference';
 import { Releases } from './components/Releases';
+import { DashboardLayout } from './dashboard/DashboardLayout';
 import { Footer } from './components/Footer';
 
 export const App: React.FC = () => {
@@ -52,6 +53,7 @@ export const App: React.FC = () => {
             <Benchmarks />
           </>
         )}
+        {activeTab === 'dashboard' && <DashboardLayout onToast={showToast} />}
         {activeTab === 'getting-started' && <GettingStarted onToast={showToast} />}
         {activeTab === 'multi-node' && <MultiNode onToast={showToast} />}
         {activeTab === 'tunnels' && <Tunnels onToast={showToast} />}

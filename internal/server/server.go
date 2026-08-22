@@ -50,10 +50,13 @@ import (
 	rbacv1 "github.com/vikukumar/tarak/api/rbac/v1"
 	storagev1 "github.com/vikukumar/tarak/api/storage/v1"
 	tarakv1 "github.com/vikukumar/tarak/api/tarak/v1"
+	"github.com/vikukumar/tarak/internal/auth"
 	"github.com/vikukumar/tarak/internal/controller"
 	"github.com/vikukumar/tarak/internal/ingress"
+	"github.com/vikukumar/tarak/internal/rbac"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
+	"github.com/vikukumar/tarak/internal/telemetry"
 	"github.com/vikukumar/tarak/internal/tunnel"
 	"github.com/vikukumar/tarak/internal/version"
 	"github.com/vikukumar/tarak/pkg/api/handler"
@@ -122,11 +125,14 @@ type Server struct {
 	health        *health.Handler
 	metrics       *metrics.Registry
 	log           *zap.Logger
-	httpSrv       *http.Server
-	ingressRouter *ingress.Router
-	ingressCtrl   *ingress.Controller
-	cfManager     *tunnel.CloudflareManager
-	tsManager     *tunnel.TailscaleManager
+	httpSrv         *http.Server
+	ingressRouter   *ingress.Router
+	ingressCtrl     *ingress.Controller
+	cfManager       *tunnel.CloudflareManager
+	tsManager       *tunnel.TailscaleManager
+	ssoManager      *auth.Manager
+	rbacAuthorizer  *rbac.Authorizer
+	hubbleCollector *telemetry.Collector
 }
 
 // New creates a new Server from the given configuration.
@@ -154,6 +160,9 @@ func New(cfg Config) (*Server, error) {
 	h := health.NewHandler()
 	m := metrics.NewRegistry()
 	rt := tarakruntime.NewEngine(cfg.DataDir, cfg.Log)
+	ssoMgr := auth.NewManager(nil, cfg.Log)
+	rbacAuth := rbac.NewAuthorizer(store, cfg.Log)
+	hubbleColl := telemetry.NewCollector(cfg.Log)
 
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
@@ -162,12 +171,15 @@ func New(cfg Config) (*Server, error) {
 	})
 
 	s := &Server{
-		cfg:     cfg,
-		store:   store,
-		runtime: rt,
-		health:  h,
-		metrics: m,
-		log:     cfg.Log,
+		cfg:             cfg,
+		store:           store,
+		runtime:         rt,
+		health:          h,
+		metrics:         m,
+		ssoManager:      ssoMgr,
+		rbacAuthorizer:  rbacAuth,
+		hubbleCollector: hubbleColl,
+		log:             cfg.Log,
 	}
 	return s, nil
 }
@@ -304,9 +316,24 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	// Pod subresource & container execution routes
-	r.Get("/api/v1/namespaces/{namespace}/pods/{name}/log", s.servePodLog)
-	r.Post("/api/v1/namespaces/{namespace}/pods/{name}/exec", s.servePodExec)
+	r.Get("/api/v1/namespaces/{namespace}/pods/{name}/log", s.HandlePodLogs)
+	r.Post("/api/v1/namespaces/{namespace}/pods/{name}/exec", s.HandlePodExec)
 	r.Get("/api/v1/namespaces/{namespace}/pods/{name}/portforward", s.servePodPortForward)
+
+	// Auth & SSO routes
+	r.Route("/apis/auth.tarak.io/v1", func(r chi.Router) {
+		r.Get("/providers", s.ssoManager.HandleListProviders)
+		r.Post("/login", s.ssoManager.HandleLogin)
+		r.Get("/userinfo", s.ssoManager.HandleUserInfo)
+	})
+
+	// Authorization reviews (k8s standard)
+	r.Post("/apis/authorization.k8s.io/v1/selfsubjectaccessreviews", s.rbacAuthorizer.HandlePermissionCheck)
+
+	// Telemetry & Hubble Network Flows
+	r.Route("/apis/telemetry.tarak.io/v1", func(r chi.Router) {
+		r.Get("/flows", s.hubbleCollector.HandleListFlows)
+	})
 
 	// Metrics API (kubectl top pods / nodes)
 	r.Get("/apis/metrics.k8s.io/v1beta1", s.serveAPIResourceList("metrics.k8s.io", "v1beta1"))

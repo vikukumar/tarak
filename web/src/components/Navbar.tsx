@@ -10,7 +10,8 @@ import {
   Cpu, 
   Terminal, 
   Code2, 
-  PackageCheck 
+  PackageCheck,
+  LayoutDashboard
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -23,12 +24,13 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'getting-started', label: 'Getting Started', icon: Rocket },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, highlight: true },
+    { id: 'getting-started', label: 'Quickstart', icon: Rocket },
     { id: 'multi-node', label: 'Multi-Node', icon: Network },
-    { id: 'tunnels', label: 'Tunnels & Ingress', icon: CloudLightning },
+    { id: 'tunnels', label: 'Tunnels', icon: CloudLightning },
     { id: 'architecture', label: 'Architecture', icon: Cpu },
-    { id: 'api-reference', label: 'API Reference', icon: Code2 },
-    { id: 'cli-reference', label: 'CLI Reference', icon: Terminal },
+    { id: 'api-reference', label: 'API', icon: Code2 },
+    { id: 'cli-reference', label: 'CLI', icon: Terminal },
     { id: 'releases', label: 'Releases', icon: PackageCheck }
   ];
 
