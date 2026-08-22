@@ -152,14 +152,15 @@ func newAgentCommand() *cobra.Command {
 					log.Info("shutting down taraks agent...")
 					return nil
 				case <-ticker.C:
-					sys := tarakruntime.SampleSystemMetrics()
+					var m runtime.MemStats
+					runtime.ReadMemStats(&m)
 					log.Debug("node metrics sampled",
-						zap.Int("cpuMillicores", int(sys.CPUMillicores)),
-						zap.Float64("cpuPercent", sys.CPUPercent),
-						zap.Uint64("memoryUsed", sys.UsedMemoryBytes),
+						zap.Uint64("memoryAllocBytes", m.Alloc),
+						zap.Uint64("memorySysBytes", m.Sys),
+						zap.Uint32("goroutines", uint32(runtime.NumGoroutine())),
 					)
 					// Send heartbeat to control plane
-					_ = sendNodeHeartbeat(ctx, client, serverURL, nodeName, sys)
+					_ = sendNodeHeartbeat(ctx, client, serverURL, nodeName, m)
 				}
 			}
 		},
@@ -239,7 +240,7 @@ func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nod
 	return fmt.Errorf("node registration returned status: %d", resp.StatusCode)
 }
 
-func sendNodeHeartbeat(ctx context.Context, client *http.Client, serverURL, nodeName string, sys tarakruntime.SystemMetrics) error {
+func sendNodeHeartbeat(ctx context.Context, client *http.Client, serverURL, nodeName string, m runtime.MemStats) error {
 	heartbeat := map[string]interface{}{
 		"status": map[string]interface{}{
 			"phase": "Running",
@@ -252,12 +253,12 @@ func sendNodeHeartbeat(ctx context.Context, client *http.Client, serverURL, node
 				},
 			},
 			"capacity": map[string]interface{}{
-				"cpu":    fmt.Sprintf("%dm", sys.CPUMillicores),
-				"memory": fmt.Sprintf("%dKi", sys.TotalMemoryBytes/1024),
+				"cpu":    fmt.Sprintf("%d", runtime.NumCPU()),
+				"memory": fmt.Sprintf("%dKi", m.Sys/1024),
 			},
 			"allocatable": map[string]interface{}{
-				"cpu":    fmt.Sprintf("%dm", sys.CPUMillicores),
-				"memory": fmt.Sprintf("%dKi", sys.FreeMemoryBytes/1024),
+				"cpu":    fmt.Sprintf("%d", runtime.NumCPU()),
+				"memory": fmt.Sprintf("%dKi", (m.Sys-m.Alloc)/1024),
 			},
 		},
 	}

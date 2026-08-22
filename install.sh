@@ -40,9 +40,9 @@ echo "🚀 Extracting binaries..."
 tar -xzf "${TMP_DIR}/${TARBALL}" -C "${TMP_DIR}"
 
 if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMP_DIR}/tarak" "${TMP_DIR}/tarakctl" "$INSTALL_DIR/"
+  mv "${TMP_DIR}"/tarak* "$INSTALL_DIR/"
 else
-  sudo mv "${TMP_DIR}/tarak" "${TMP_DIR}/tarakctl" "$INSTALL_DIR/"
+  sudo mv "${TMP_DIR}"/tarak* "$INSTALL_DIR/"
 fi
 
 rm -rf "$TMP_DIR"
