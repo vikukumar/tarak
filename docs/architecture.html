@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture — Tarak Documentation</title>
+  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <a href="index.html" class="logo-container">
+      <img src="assets/tarak_icon.jpg" alt="Tarak Icon">
+      <span>TARAK</span>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="architecture.html" class="active">Architecture</a>
+      <a href="cli-reference.html">CLI Reference</a>
+      <a href="releases.html">Releases & Changelog</a>
+      <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank">⭐ GitHub</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div style="margin-bottom: 2.5rem;">
+      <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏛️ Tarak System Architecture</h1>
+      <p style="color: var(--text-secondary);">An inside look at how Tarak achieves sub-second container orchestration without external dependencies.</p>
+    </div>
+
+    <!-- Section 1: TCR -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">1. Tarak Container Runtime (TCR)</h2>
+      <p style="margin-bottom: 1rem;">
+        TCR replaces the complex Docker/containerd/runc stack with native OS primitives:
+      </p>
+      <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li><b>OCI Layer Unpacker</b>: Directly connects to Docker Hub / OCI registries, authenticates, streams tar layers, and extracts the container rootfs directly to local cache.</li>
+        <li><b>Process Isolation</b>: Uses Linux kernel namespaces on Linux and native process job objects / token isolation on Windows/macOS.</li>
+        <li><b>Zero-Socket Overhead</b>: Eliminates socket proxy latency, providing direct kernel scheduling.</li>
+      </ul>
+    </div>
+
+    <!-- Section 2: Virtual Pod Bridge -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">2. Virtual Pod Bridge & Networking</h2>
+      <p style="margin-bottom: 1rem;">
+        Tarak assigns dedicated <code>10.244.0.0/16</code> subnet IPs to each pod. The internal Virtual Pod Bridge manages:
+      </p>
+      <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li><b>ClusterIP Routing</b>: Instant in-memory L4 proxying between services and healthy pods.</li>
+        <li><b>MetalLB Emulation</b>: Native public IP address pool allocation (<code>192.168.x.x</code>) without external CNI plugins.</li>
+        <li><b>Port-Forward Streaming</b>: Bidirectional TCP multiplexing between client CLI and container endpoints.</li>
+      </ul>
+    </div>
+
+    <!-- Section 3: Control Plane -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 style="color: var(--accent-cyan); margin-bottom: 0.75rem;">3. High-Performance Pure-Go Control Plane</h2>
+      <p style="margin-bottom: 1rem;">
+        The Tarak control plane runs embedded in pure Go with BoltDB state storage:
+      </p>
+      <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li><b>Dual API Groups</b>: Supports standard <code>k8s.io</code> endpoints and high-speed native <code>tarak.io</code> aliases.</li>
+        <li><b>Sub-Millisecond Raft & Watchers</b>: Reactive event loops with zero polling latency.</li>
+        <li><b>Automatic PKI Bootstrap</b>: P-256 ECDSA root CA, server certificates, and administrator client certificates generated in &lt; 20ms.</li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <p>© 2026 Tarak Authors. Released under the MIT License.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
