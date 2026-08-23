@@ -131,7 +131,7 @@ export default function ClusterOverviewPage() {
             {clusterInfo.servicesCount}
           </div>
           <div className="text-[11px] text-indigo-300">
-            MetalLB: <span className="font-mono">192.168.1.240</span>
+            MetalLB: <span className="font-mono">{nodes[0]?.status?.addresses?.find((a: any) => a.type === "InternalIP")?.address || "Host Bridge VIP"}</span>
           </div>
         </Card>
 

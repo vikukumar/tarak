@@ -77,6 +77,11 @@ func (c *Controller) ReleaseVIP(serviceKey string) {
 	c.pool.Release(serviceKey)
 }
 
+// SyncServiceForwarding updates the live TCP proxy listener for a service or nodePort.
+func (c *Controller) SyncServiceForwarding(ctx context.Context, listenAddr string, endpoints []Endpoint) error {
+	return c.forwarder.UpdateServiceRoutes(ctx, listenAddr, endpoints)
+}
+
 // PublicIP returns the active detected public WAN IP.
 func (c *Controller) PublicIP() string {
 	if c.publicIP != "" {

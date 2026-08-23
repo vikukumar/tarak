@@ -558,7 +558,7 @@ func (s *Server) Run(ctx context.Context) error {
 		version.String(), s.cfg.BindAddress, s.cfg.IngressHTTPAddress, s.cfg.BindAddress)
 
 	// ── Controller Manager ───────────────────────────────────────────────
-	ctrlMgr := controller.NewManager(s.store, s.runtime, s.log)
+	ctrlMgr := controller.NewManager(s.store, s.runtime, s.lbCtrl, s.networkDriver, s.log)
 	ctrlMgr.SetIngressReconciler(func(c context.Context) {
 		_ = s.ingressCtrl.Reconcile(c, s.cfManager.PublicURL())
 	})

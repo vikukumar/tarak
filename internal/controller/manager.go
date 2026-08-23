@@ -14,6 +14,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/vikukumar/tarak/internal/loadbalancer"
+	"github.com/vikukumar/tarak/internal/network"
 	"github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
 )
@@ -23,6 +25,8 @@ import (
 type Manager struct {
 	store       statestore.Store
 	runtime     runtime.Runtime
+	lbCtrl      *loadbalancer.Controller
+	netDriver   *network.Driver
 	log         *zap.Logger
 	mu          sync.Mutex
 	backoffs    map[string]time.Time
@@ -30,7 +34,7 @@ type Manager struct {
 }
 
 // NewManager constructs a new controller manager.
-func NewManager(store statestore.Store, rt runtime.Runtime, log *zap.Logger) *Manager {
+func NewManager(store statestore.Store, rt runtime.Runtime, lbCtrl *loadbalancer.Controller, netDriver *network.Driver, log *zap.Logger) *Manager {
 	if log == nil {
 		log = zap.NewNop()
 	}
@@ -39,10 +43,12 @@ func NewManager(store statestore.Store, rt runtime.Runtime, log *zap.Logger) *Ma
 		rt = runtime.NewEngine("", namedLog)
 	}
 	return &Manager{
-		store:    store,
-		runtime:  rt,
-		log:      namedLog,
-		backoffs: make(map[string]time.Time),
+		store:     store,
+		runtime:   rt,
+		lbCtrl:    lbCtrl,
+		netDriver: netDriver,
+		log:       namedLog,
+		backoffs:  make(map[string]time.Time),
 	}
 }
 
@@ -689,9 +695,72 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 			}
 		}
 
-		// 3. MetalLB / Public IP LoadBalancer allocation
+		// 3. MetalLB / Public IP LoadBalancer allocation & Live TCP Forwarding
+		var endpoints []loadbalancer.Endpoint
+		selector, _ := spec["selector"].(map[string]interface{})
+		if selector != nil {
+			podEnvs, _, _ := m.store.List(ctx, statestore.ListQuery{
+				Key: statestore.ResourceKey{
+					Group:     "",
+					Version:   "v1",
+					Resource:  "pods",
+					Namespace: ns,
+				},
+			})
+			for _, pEnv := range podEnvs {
+				var pObj map[string]interface{}
+				if err := json.Unmarshal(pEnv.Object, &pObj); err != nil {
+					continue
+				}
+				pMeta, _ := pObj["metadata"].(map[string]interface{})
+				pLabels, _ := pMeta["labels"].(map[string]interface{})
+				match := true
+				for k, v := range selector {
+					if pLabels[k] != v {
+						match = false
+						break
+					}
+				}
+				if match {
+					pStatus, _ := pObj["status"].(map[string]interface{})
+					podIP, _ := pStatus["podIP"].(string)
+					if podIP == "" {
+						podIP = "127.0.0.1"
+					}
+					// Find container target port
+					pSpec, _ := pObj["spec"].(map[string]interface{})
+					pContainers, _ := pSpec["containers"].([]interface{})
+					tPort := 80
+					for _, c := range pContainers {
+						cMap, _ := c.(map[string]interface{})
+						cPorts, _ := cMap["ports"].([]interface{})
+						for _, cp := range cPorts {
+							cpMap, _ := cp.(map[string]interface{})
+							if portVal, ok := cpMap["containerPort"].(float64); ok && portVal > 0 {
+								tPort = int(portVal)
+								break
+							}
+						}
+					}
+					endpoints = append(endpoints, loadbalancer.Endpoint{
+						Address: "127.0.0.1",
+						Port:    tPort,
+						Healthy: true,
+					})
+					if m.netDriver != nil && podIP != "127.0.0.1" {
+						m.netDriver.RegisterPodRoute(podIP, fmt.Sprintf("127.0.0.1:%d", tPort))
+					}
+				}
+			}
+		}
+
 		if svcType == "LoadBalancer" {
-			targetIP := "192.168.1.240"
+			targetIP := "100.97.82.54"
+			if m.netDriver != nil {
+				if lan := m.netDriver.GetHostNetworkInfo().PrimaryLANIP; lan != "" {
+					targetIP = lan
+				}
+			}
 			if lbIP, _ := spec["loadBalancerIP"].(string); lbIP != "" {
 				targetIP = lbIP
 			}
@@ -720,6 +789,27 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 				svc["status"] = status
 				needsUpdate = true
 				m.log.Info("tarak metallb controller assigned public IP to service", zap.String("service", name), zap.String("externalIP", targetIP))
+			}
+		}
+
+		// 4. Live TCP Proxy Forwarding to Host
+		if m.lbCtrl != nil && len(endpoints) > 0 {
+			for _, p := range ports {
+				pMap, ok := p.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				svcPort, _ := pMap["port"].(float64)
+				np, _ := pMap["nodePort"].(float64)
+
+				if np > 0 {
+					listenAddr := fmt.Sprintf("0.0.0.0:%d", int(np))
+					_ = m.lbCtrl.SyncServiceForwarding(ctx, listenAddr, endpoints)
+				}
+				if svcType == "LoadBalancer" && svcPort > 0 {
+					listenAddr := fmt.Sprintf("0.0.0.0:%d", int(svcPort))
+					_ = m.lbCtrl.SyncServiceForwarding(ctx, listenAddr, endpoints)
+				}
 			}
 		}
 

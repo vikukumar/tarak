@@ -37,45 +37,72 @@ export default function NodesPage() {
     fetchNodes();
   }, []);
 
+  const primaryNode = nodes[0] || {};
+  const labels = primaryNode.metadata?.labels || {};
+  const totalCores = nodes.reduce((sum, n) => sum + (parseInt(n.status?.capacity?.cpu || "0") || 0), 0) || 12;
+  const totalMemory = labels["tarak.io/total-memory-gb"] || (primaryNode.status?.capacity?.memory ? `${primaryNode.status?.capacity?.memory}` : "31.8 GiB");
+  const cpuModel = labels["tarak.io/cpu-model"] || `Host CPU (${totalCores} Cores)`;
+  const arch = primaryNode.status?.nodeInfo?.architecture || "amd64";
+  const isFullHost = labels["tarak.io/full-host-allocation"] === "true";
+  const primaryLAN = primaryNode.status?.addresses?.find((a: any) => a.type === "InternalIP")?.address || labels["tarak.io/host-lan-ip"] || "127.0.0.1";
+  const primaryWAN = primaryNode.status?.addresses?.find((a: any) => a.type === "ExternalIP")?.address || labels["tarak.io/host-public-ip"] || primaryLAN;
+
   const columns: Column<any>[] = [
     {
       key: "name",
       header: "Node Name",
       sortable: true,
-      render: (n) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <Server size={16} />
+      render: (n) => {
+        const nLabels = n.metadata?.labels || {};
+        const nAddresses = n.status?.addresses || [];
+        const nLAN = nAddresses.find((a: any) => a.type === "InternalIP")?.address || nLabels["tarak.io/host-lan-ip"] || "127.0.0.1";
+        const nWAN = nAddresses.find((a: any) => a.type === "ExternalIP")?.address || nLabels["tarak.io/host-public-ip"] || "-";
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+              <Server size={16} />
+            </div>
+            <div>
+              <span className="font-bold text-white block text-sm">{n.metadata?.name}</span>
+              <span className="text-[11px] text-slate-400 font-mono">
+                LAN: {nLAN} | WAN: {nWAN}
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="font-bold text-white block text-sm">{n.metadata?.name}</span>
-            <span className="text-[11px] text-slate-400 font-mono">
-              IP: {n.status?.addresses?.[0]?.address || "127.0.0.1"}
-            </span>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "status",
       header: "Status",
       render: () => (
         <Badge variant="emerald" dot>
-          Ready
+          Ready (Bridge Active)
         </Badge>
       ),
     },
     {
-      key: "role",
-      header: "Roles",
-      render: () => <Badge variant="indigo">control-plane, worker</Badge>,
+      key: "capacity",
+      header: "Hardware Capacity",
+      render: (n) => {
+        const c = n.status?.capacity || {};
+        const nLabels = n.metadata?.labels || {};
+        const ram = nLabels["tarak.io/total-memory-gb"] || c.memory || "31.8 GiB";
+        return (
+          <div className="font-mono text-xs">
+            <span className="text-cyan-300 font-semibold">{c.cpu || totalCores} Cores</span>
+            <span className="text-slate-500 mx-1">/</span>
+            <span className="text-indigo-300 font-semibold">{ram}</span>
+          </div>
+        );
+      },
     },
     {
       key: "runtime",
       header: "Container Runtime",
       render: (n) => (
         <span className="text-cyan-300 font-mono text-[11px]">
-          {n.status?.nodeInfo?.containerRuntimeVersion || "tarak-native://1.0.6"}
+          {n.status?.nodeInfo?.containerRuntimeVersion || "tarak-runtime://v1.30.0"}
         </span>
       ),
     },
@@ -84,7 +111,7 @@ export default function NodesPage() {
       header: "OS Image",
       render: (n) => (
         <span className="text-slate-300 text-xs">
-          {n.status?.nodeInfo?.osImage || "Windows Server / AMD64"}
+          {n.status?.nodeInfo?.osImage || "Tarak Native (windows/amd64)"}
         </span>
       ),
     },
@@ -105,10 +132,10 @@ export default function NodesPage() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2.5">
             <Cpu size={24} className="text-cyan-400" />
-            <span>Cluster Nodes</span>
+            <span>Cluster Nodes & Hardware</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Registered physical and virtual compute instances. Click any node to inspect telemetry, pods, and capacity.
+            Live host hardware capacity and direct host bridge network connections. Click any node to inspect telemetry, pods, and capacity.
           </p>
         </div>
 
@@ -132,7 +159,7 @@ export default function NodesPage() {
           <div className="text-2xl font-bold text-white">{nodes.length || 1}</div>
           <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
             <CheckCircle2 size={12} />
-            100% Online & Healthy
+            100% Online & Direct Bridge
           </span>
         </div>
 
@@ -140,9 +167,9 @@ export default function NodesPage() {
           <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
             Total CPU Cores
           </span>
-          <div className="text-2xl font-bold text-cyan-400">8 Cores</div>
-          <span className="text-[11px] text-slate-400 font-mono">
-            Architecture: x86_64 / amd64
+          <div className="text-2xl font-bold text-cyan-400">{totalCores} Cores</div>
+          <span className="text-[11px] text-slate-400 font-mono truncate block">
+            {cpuModel} ({arch})
           </span>
         </div>
 
@@ -150,9 +177,9 @@ export default function NodesPage() {
           <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
             Memory Capacity
           </span>
-          <div className="text-2xl font-bold text-indigo-400">16 GB</div>
+          <div className="text-2xl font-bold text-indigo-400">{totalMemory}</div>
           <span className="text-[11px] text-slate-400 font-mono">
-            Zero-Daemon Memory Isolated
+            {isFullHost ? "100% Host Physical Memory" : "Allocated Quota"}
           </span>
         </div>
       </div>
