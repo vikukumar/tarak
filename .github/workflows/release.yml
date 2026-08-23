@@ -152,7 +152,7 @@ jobs:
           NEW_TAG="v$NEW_VER"
           echo "Computed new version: $NEW_VER ($NEW_TAG) - Reason: $BUMP_REASON"
 
-          # Sync version into internal/version/version.go
+          # 1. Sync version into internal/version/version.go
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           GIT_SHA=$(git rev-parse --short HEAD)
 
@@ -163,12 +163,29 @@ jobs:
           echo "Updated internal/version/version.go:"
           cat internal/version/version.go
 
+          # 2. Sync version into dashboard/package.json and web/package.json
+          echo "Synchronizing versions across dashboard/package.json and web/package.json..."
+          npm --prefix dashboard version "$NEW_VER" --no-git-tag-version --allow-same-version || true
+          npm --prefix web version "$NEW_VER" --no-git-tag-version --allow-same-version || true
+
+          # 3. Rebuild Next.js UI & Web React app with new version
+          echo "Rebuilding embedded dashboard UI & web portal with new version $NEW_TAG..."
+          (cd dashboard && npm run build)
+          mkdir -p internal/ui/dist
+          rm -rf internal/ui/dist/*
+          cp -r dashboard/out/* internal/ui/dist/
+
+          (cd web && npm run build)
+          mkdir -p docs/assets docs/data
+          cp -r web/dist/* docs/ 2>/dev/null || true
+
           # Configure Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if ! git diff --quiet internal/version/version.go; then
-            git add internal/version/version.go
+          # Commit all synced manifests & build outputs
+          git add internal/version/version.go dashboard/package*.json web/package*.json internal/ui/dist docs/ web/dist/ 2>/dev/null || true
+          if ! git diff --cached --quiet; then
             git commit -m "chore(release): bump version to $NEW_TAG [skip ci]" || true
             git push origin HEAD:${{ github.ref_name }} || echo "Direct branch push skipped or protected by rules"
           fi

@@ -41,15 +41,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build & Sync Web Assets into Docs
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Vite React Documentation Web App
         run: |
-          echo "Building & Synchronizing Documentation Portal..."
+          echo "Building Vite React Documentation Portal..."
+          cd web
+          npm ci || npm install
+          npm run build
+          cd ..
+
+      - name: Prepare Documentation Distribution for GitHub Pages
+        run: |
+          echo "Synchronizing Vite React artifacts into docs..."
           mkdir -p docs/assets docs/data
 
-          # Sync any assets from web/public into docs
-          if [ -d "web/public" ]; then
-            echo "Copying web/public assets into docs..."
-            cp -r web/public/* docs/ 2>/dev/null || true
+          # Sync canonical assets into web/dist and docs/assets
+          if [ -d "docs/assets" ]; then
+            cp -r docs/assets/* web/dist/assets/ 2>/dev/null || true
+          fi
+
+          # Copy compiled Vite assets into docs
+          if [ -d "web/dist" ]; then
+            echo "Copying web/dist into docs..."
+            cp -r web/dist/* docs/ 2>/dev/null || true
           fi
 
           # Ensure CNAME is set for custom domain
@@ -57,9 +75,9 @@ jobs:
             echo "tarak.vikshro.in" > docs/CNAME
           fi
 
-          echo "Documentation assets prepared:"
+          echo "Documentation distribution prepared successfully:"
           ls -la docs/
-          ls -la docs/assets/
+          ls -la docs/assets/ || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
