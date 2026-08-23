@@ -155,6 +155,7 @@ type Server struct {
 	zeroTrustMgr    *zerotrust.Manager
 	wsHub           *ws.Hub
 	networkDriver   *network.Driver
+	cni             *network.InbuiltCNI
 	hostInfo        hardware.HostInfo
 	alloc           hardware.ResourceAllocation
 }
@@ -209,6 +210,14 @@ func New(cfg Config) (*Server, error) {
 		EnablemTLS:  true,
 	}, cfg.Log)
 
+	inbuiltCNI := network.NewInbuiltCNI(network.CNIConfig{
+		PodCIDR:      "10.244.0.0/16",
+		ServiceCIDR:  "10.96.0.0/12",
+		DNSServerIP:  "10.96.0.10",
+		BridgeName:   "tarak-br0",
+		EnablePolicy: true,
+	}, cfg.Log)
+
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
 		_, err := store.CurrentRevision(context.Background())
@@ -231,6 +240,7 @@ func New(cfg Config) (*Server, error) {
 		zeroTrustMgr:    zeroTrustMgr,
 		wsHub:           wsHub,
 		networkDriver:   netDriver,
+		cni:             inbuiltCNI,
 		hostInfo:        hostInfo,
 		alloc:           alloc,
 	}
@@ -501,6 +511,28 @@ func (s *Server) Run(ctx context.Context) error {
 	ln, err := net.Listen("tcp", s.cfg.BindAddress)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", s.cfg.BindAddress, err)
+	}
+
+	// ── Auto-Detect Host Cloudflare & Tailscale Tunnels ──────────────────
+	det := tunnel.DetectHostTunnels(s.log)
+	if !s.cfg.CloudflareTunnel && det.CloudflareDetected {
+		s.log.Info("⚡ auto-activating Cloudflare Tunnel (detected host agent/credentials)",
+			zap.String("bin", det.CloudflareBinPath),
+		)
+		s.cfg.CloudflareTunnel = true
+		if det.CloudflareToken != "" && s.cfg.CloudflareToken == "" {
+			s.cfg.CloudflareToken = det.CloudflareToken
+		}
+	}
+	if !s.cfg.Tailscale && det.TailscaleDetected {
+		s.log.Info("⚡ auto-activating Tailscale WireGuard Mesh (detected host daemon/IP)",
+			zap.String("bin", det.TailscaleBinPath),
+			zap.String("tailscaleIP", det.TailscaleIP),
+		)
+		s.cfg.Tailscale = true
+		if det.TailscaleAuthKey != "" && s.cfg.TailscaleAuthKey == "" {
+			s.cfg.TailscaleAuthKey = det.TailscaleAuthKey
+		}
 	}
 
 	// ── Ingress & Tunnels Initialization ─────────────────────────────────
