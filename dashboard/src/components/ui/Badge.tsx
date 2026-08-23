@@ -1,8 +1,17 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
+export type BadgeVariant =
+  | "cyan"
+  | "emerald"
+  | "amber"
+  | "rose"
+  | "indigo"
+  | "purple"
+  | "muted";
+
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "cyan" | "emerald" | "amber" | "rose" | "indigo" | "muted";
+  variant?: BadgeVariant;
   dot?: boolean;
 }
 
@@ -13,21 +22,23 @@ export const Badge: React.FC<BadgeProps> = ({
   children,
   ...props
 }) => {
-  const variantStyles = {
+  const variantStyles: Record<BadgeVariant, string> = {
     cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
     emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
     amber: "bg-amber-500/10 text-amber-400 border-amber-500/30",
     rose: "bg-rose-500/10 text-rose-400 border-rose-500/30",
     indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
+    purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
     muted: "bg-slate-800/60 text-slate-300 border-white/10",
   };
 
-  const dotStyles = {
+  const dotStyles: Record<BadgeVariant, string> = {
     cyan: "bg-cyan-400 shadow-[0_0_8px_#00f0ff]",
     emerald: "bg-emerald-400 shadow-[0_0_8px_#10b981]",
     amber: "bg-amber-400 shadow-[0_0_8px_#f59e0b]",
     rose: "bg-rose-400 shadow-[0_0_8px_#f43f5e]",
     indigo: "bg-indigo-400 shadow-[0_0_8px_#6366f1]",
+    purple: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
     muted: "bg-slate-400",
   };
 
