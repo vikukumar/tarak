@@ -52,11 +52,13 @@ import (
 	tarakv1 "github.com/vikukumar/tarak/api/tarak/v1"
 	"github.com/vikukumar/tarak/internal/auth"
 	"github.com/vikukumar/tarak/internal/controller"
+	"github.com/vikukumar/tarak/internal/gitops"
 	"github.com/vikukumar/tarak/internal/hardware"
 	"github.com/vikukumar/tarak/internal/ingress"
 	"github.com/vikukumar/tarak/internal/loadbalancer"
 	"github.com/vikukumar/tarak/internal/mesh"
 	"github.com/vikukumar/tarak/internal/network"
+	"github.com/vikukumar/tarak/internal/policy"
 	"github.com/vikukumar/tarak/internal/rbac"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
@@ -156,6 +158,8 @@ type Server struct {
 	wsHub           *ws.Hub
 	networkDriver   *network.Driver
 	cni             *network.InbuiltCNI
+	policyEngine    *policy.Engine
+	gitopsEngine    *gitops.Engine
 	hostInfo        hardware.HostInfo
 	alloc           hardware.ResourceAllocation
 }
@@ -201,6 +205,8 @@ func New(cfg Config) (*Server, error) {
 	multiMeshMgr := mesh.NewMultiMeshManager(cfg.Log)
 	zeroTrustMgr := zerotrust.NewManager(cfg.Log)
 	wsHub := ws.NewHub(cfg.Log)
+	polEngine := policy.NewEngine(cfg.Log)
+	gitopsEng := gitops.NewEngine(cfg.Log)
 
 	hostInfo := hardware.DetectHost()
 	alloc := hardware.ComputeAllocation(hostInfo, cfg.CPULimit, cfg.MemoryLimit, cfg.GPULimit)
@@ -241,6 +247,8 @@ func New(cfg Config) (*Server, error) {
 		wsHub:           wsHub,
 		networkDriver:   netDriver,
 		cni:             inbuiltCNI,
+		policyEngine:    polEngine,
+		gitopsEngine:    gitopsEng,
 		hostInfo:        hostInfo,
 		alloc:           alloc,
 	}
@@ -468,6 +476,39 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Post("/policies", s.zeroTrustMgr.HandleCreatePolicy)
 		r.Post("/evaluate", s.zeroTrustMgr.HandleEvaluate)
 		r.Delete("/namespaces/{namespace}/policies/{name}", s.zeroTrustMgr.HandleDeletePolicy)
+	})
+
+	// ── Kyverno-Compatible Policy Engine API ──────────────────────────────
+	r.Route("/apis/policy.tarak.io/v1", func(r chi.Router) {
+		r.Get("/report", func(w http.ResponseWriter, req *http.Request) {
+			rep := s.policyEngine.GetReport(req.Context())
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(rep)
+		})
+		r.Get("/rules", func(w http.ResponseWriter, req *http.Request) {
+			rules := s.policyEngine.ListRules()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": rules})
+		})
+	})
+
+	// ── GitOps Continuous Delivery API (ArgoCD Equivalent) ────────────────
+	r.Route("/apis/gitops.tarak.io/v1", func(r chi.Router) {
+		r.Get("/applications", func(w http.ResponseWriter, req *http.Request) {
+			apps := s.gitopsEngine.ListApplications()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": apps})
+		})
+		r.Post("/applications/{name}/sync", func(w http.ResponseWriter, req *http.Request) {
+			name := chi.URLParam(req, "name")
+			app, err := s.gitopsEngine.SyncApplication(req.Context(), name)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(app)
+		})
 	})
 
 	// ── Live WebSocket Streaming Hub (Real-time cluster telemetry & Hubble) ─

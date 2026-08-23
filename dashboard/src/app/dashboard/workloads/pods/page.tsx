@@ -115,6 +115,38 @@ export default function PodsPage() {
       ),
     },
     {
+      key: "probes",
+      header: "Container Probes",
+      render: (p) => {
+        const hasLiveness = !!p.spec?.containers?.[0]?.livenessProbe;
+        const hasReadiness = !!p.spec?.containers?.[0]?.readinessProbe;
+        return (
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <span
+              className={`px-1.5 py-0.5 rounded font-bold border ${
+                hasLiveness
+                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                  : "bg-slate-800/80 text-slate-400 border-white/10"
+              }`}
+              title="Liveness Probe Status"
+            >
+              L: {hasLiveness ? "Passing" : "None"}
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded font-bold border ${
+                hasReadiness
+                  ? "bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                  : "bg-slate-800/80 text-slate-400 border-white/10"
+              }`}
+              title="Readiness Probe Status"
+            >
+              R: {hasReadiness ? "Ready" : "Ready"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       key: "restarts",
       header: "Restarts",
       render: (p) => {

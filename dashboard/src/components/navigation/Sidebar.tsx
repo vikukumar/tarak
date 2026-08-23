@@ -28,6 +28,10 @@ import {
   PanelLeftOpen,
   Cloud,
   Zap,
+  GitBranch,
+  FolderGit2,
+  Sliders,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +48,15 @@ export const navigationConfig: NavItem[] = [
     title: "Cluster Overview",
     href: "/dashboard",
     icon: Sparkles,
+  },
+  {
+    title: "Continuous Delivery (CD)",
+    icon: GitBranch,
+    badge: "GitOps",
+    children: [
+      { title: "Applications (ArgoCD)", href: "/dashboard/cd", icon: Box, badge: "Live" },
+      { title: "Git Repositories", href: "/dashboard/cd/repositories", icon: FolderGit2 },
+    ],
   },
   {
     title: "Compute & Workloads",
@@ -79,11 +92,12 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    title: "Service Mesh (Kuma)",
+    title: "Service Mesh (Kuma / Kong)",
     icon: Radio,
     badge: "mTLS",
     children: [
       { title: "Mesh Overview", href: "/dashboard/mesh/overview", icon: Radio },
+      { title: "Traffic Policies & Rules", href: "/dashboard/mesh/policies", icon: Sliders },
       { title: "Traffic Permissions", href: "/dashboard/mesh/permissions", icon: Lock },
       { title: "Passthrough Policies", href: "/dashboard/mesh/passthrough", icon: Network },
       { title: "Canary & Routes", href: "/dashboard/mesh/routes", icon: Workflow },
@@ -100,11 +114,12 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    title: "Security & Zero-Trust",
+    title: "Security & Governance",
     icon: Shield,
     children: [
+      { title: "Kyverno Policy Analysis", href: "/dashboard/security/policies", icon: ShieldCheck, badge: "Policy" },
       { title: "RBAC Matrix", href: "/dashboard/security/rbac", icon: Lock },
-      { title: "Tarak Security Policies", href: "/dashboard/security/zerotrust", icon: Shield },
+      { title: "Zero-Trust Enforcement", href: "/dashboard/security/zerotrust", icon: Shield },
       { title: "SSO & Identity", href: "/dashboard/security/sso", icon: Key },
       { title: "Service Accounts & PKI", href: "/dashboard/security/certificates", icon: Key },
     ],
