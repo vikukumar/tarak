@@ -3,13 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Architecture — TARAK Documentation</title>
-  <meta name="description" content="Deep dive into Tarak's internal architecture, TCR runtime, Virtual Pod Bridge, and high-speed BoltDB state store.">
+  <title>Architecture & Internal Design — TARAK Documentation</title>
+  <meta name="description" content="Technical architecture, TCR container runtime primitives, P-256 PKI, and memory model of Tarak.">
+  <meta name="author" content="Vikash Kumar">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://tarak.vikshro.in/architecture.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TARAK Platform">
+  <meta property="og:title" content="Architecture & Internal Design — TARAK">
+  <meta property="og:description" content="Technical architecture, TCR container runtime primitives, and memory model of Tarak.">
+  <meta property="og:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Architecture & Internal Design — TARAK">
+  <meta name="twitter:description" content="Technical architecture and TCR runtime design in Tarak.">
+  <meta name="twitter:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg">
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" type="image/jpeg" href="assets/tarak_icon.jpg">
+  <link rel="icon" type="image/png" href="assets/favicon-32x32.png">
 </head>
 <body>
+
+  <!-- Background Cluster Simulation Canvas -->
+  <canvas id="cluster-canvas"></canvas>
 
   <header>
     <a href="index.html" class="logo-container">

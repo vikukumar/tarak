@@ -6,11 +6,11 @@
   <title>TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative</title>
   <meta name="title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
   <meta name="description" content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than Kubernetes and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
-  <meta name="keywords" content="tarak, kubernetes alternative, k8s, k3s, container orchestration, go container runtime, cloudflare tunnel, tailscale mesh, lightweight kubernetes, devops, microservices, edge computing" />
-  <meta name="author" content="Viku Kumar (vikshro)" />
+  <meta name="keywords" content="tarak, kubernetes alternative, k8s, k3s, container orchestration, go container runtime, cloudflare tunnel, tailscale mesh, lightweight kubernetes, devops, microservices, edge computing, cloud native" />
+  <meta name="author" content="Vikash Kumar" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <link rel="canonical" href="https://tarak.vikshro.in/" />
-  <meta name="theme-color" content="#00f0ff" />
+  <meta name="theme-color" content="#030712" />
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
 
   <!-- Favicons & Manifest -->
@@ -26,16 +26,50 @@
   <!-- Open Graph / Social -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://tarak.vikshro.in/" />
-  <meta property="og:site_name" content="TARAK Platform" />
+  <meta property="og:site_name" content="TARAK Cloud Native" />
   <meta property="og:title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
   <meta property="og:description" content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than K8s and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
   <meta property="og:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@vikukumar" />
+  <meta name="twitter:creator" content="@vikukumar" />
   <meta name="twitter:title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
   <meta name="twitter:description" content="Next-generation pure Go container orchestrator. Inbuilt Cloudflare Tunnels & Tailscale mesh." />
   <meta name="twitter:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg" />
+
+  <!-- Schema.org JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TARAK",
+    "applicationCategory": "DevOpsApplication",
+    "operatingSystem": "Linux, Windows, macOS",
+    "softwareVersion": "1.0.6",
+    "description": "Ultra-lightweight zero-dependency container orchestration platform and Kubernetes alternative written in pure Go.",
+    "url": "https://tarak.vikshro.in/",
+    "author": {
+      "@type": "Person",
+      "name": "Vikash Kumar",
+      "url": "https://github.com/vikukumar"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
 </head>
 <body>
+
+  <!-- Background Cluster Simulation Canvas -->
+  <canvas id="cluster-canvas"></canvas>
 
   <!-- Glassmorphic Header -->
   <header>
@@ -76,10 +110,11 @@
 
   <main class="container">
     <!-- Hero Section -->
-    <section class="hero" style="text-align: center; padding: 4rem 0 3rem;">
-      <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
-        <span class="badge badge-cyan">v1.0.6 Production Ready</span>
+    <section class="hero" style="text-align: center; padding: 4rem 0 3rem; position: relative; z-index: 1;">
+      <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; justify-content: center;">
+        <span id="release-badge" class="badge badge-cyan">⚡ v1.0.6 Production Ready</span>
         <span class="badge badge-purple">Zero-Dependency Pure Go</span>
+        <span class="badge badge-emerald">OCI Native Sandbox</span>
       </div>
 
       <h1 style="font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800; line-height: 1.15; margin-bottom: 1.5rem;">
@@ -118,6 +153,9 @@
         <a href="getting-started.html" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #000; font-weight: 700; padding: 0.85rem 1.75rem; border-radius: 12px; text-decoration: none; box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);">
           ⚡ Get Started in 30 Seconds
         </a>
+        <a href="releases.html" data-latest-download style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 0.85rem 1.75rem; border-radius: 12px; text-decoration: none;">
+          📦 Download <span data-latest-version>v1.0.6</span>
+        </a>
         <a href="architecture.html" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 0.85rem 1.75rem; border-radius: 12px; text-decoration: none;">
           📐 Explore Architecture
         </a>
@@ -125,7 +163,7 @@
     </section>
 
     <!-- Key Advantages Grid -->
-    <section style="margin-bottom: 4.5rem;">
+    <section style="margin-bottom: 4.5rem; position: relative; z-index: 1;">
       <div style="text-align: center; margin-bottom: 2.5rem;">
         <h2 style="font-size: 2rem; font-weight: 700; color: #fff;">Why Developers Choose TARAK</h2>
         <p style="color: var(--text-secondary); margin-top: 0.5rem;">Engineered from scratch for speed, security, and extreme resource efficiency.</p>
@@ -133,100 +171,114 @@
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">⚡</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Sub-25 MB RAM Footprint</h3>
+          <div class="card-icon" style="background: rgba(0, 240, 255, 0.1); color: var(--accent-cyan); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            🚀
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Sub-180ms Cold Start</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Runs flawlessly on 512MB VPS, edge devices, Raspberry Pis, or bare-metal servers without eating host resources.
+            Zero JVM or heavy container runtime overhead. Instant bootstrap from a single self-contained binary using pure Go.
           </p>
         </div>
 
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🔒</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Inbuilt Cloudflare & Tailscale</h3>
+          <div class="card-icon" style="background: rgba(168, 85, 247, 0.1); color: var(--accent-purple); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            🌐
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Zero-Config Mesh Networking</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Zero-config public HTTPS endpoints with Cloudflare Tunnels and encrypted multi-node mesh via Tailscale WireGuard.
+            Expose local workloads globally using Cloudflare Tunnels and interconnect hybrid multi-cloud clusters via Tailscale.
           </p>
         </div>
 
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">☸️</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Kubernetes API Compatible</h3>
+          <div class="card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-emerald); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            🔒
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Automatic mTLS Zero-Trust</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Apply your existing Kubernetes manifests with <code>tarakctl apply -f</code> for Pods, Deployments, Services, and Ingresses.
+            Built-in P-256 ECDSA Certificate Authority automatically encrypts and validates all node-to-node & control plane traffic.
           </p>
         </div>
 
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🚀</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Instant Startup (&lt;180ms)</h3>
+          <div class="card-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            ⚙️
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Kubernetes API Compatible</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Zero JVM or heavy runtime overhead. Starts in milliseconds, reconciling workloads immediately on boot.
+            Deploy standard YAML specs: Pods, Deployments, Services, ConfigMaps, Secrets, Ingress, and Custom Resources (CRDs).
           </p>
         </div>
 
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🌐</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Multi-Node Cluster Ready</h3>
+          <div class="card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            📊
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Authentic Hardware Telemetry</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Connect control planes (<code>tarakd</code>) with worker nodes (<code>taraks</code>) across multi-cloud and bare-metal environments.
+            Kernel-level CPU and physical memory sampling with Prometheus-compatible endpoints and real multi-container log tailing.
           </p>
         </div>
 
         <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🖥️</div>
-          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Next.js Glassmorphic UI</h3>
+          <div class="card-icon" style="background: rgba(244, 63, 94, 0.1); color: var(--accent-rose); font-size: 1.5rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 1.25rem;">
+            💻
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem;">Modern Glassmorphic Dashboard</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
-            Built-in modern web dashboard embedded directly into the binary with real-time metrics, logs, and terminal access.
+            Built-in Next.js 16 dashboard with 41+ management modules, live resource editors, web terminal, and mesh controllers.
           </p>
         </div>
       </div>
     </section>
 
-    <!-- Architecture & Comparison Table -->
-    <section style="margin-bottom: 4.5rem;">
-      <div class="card" style="padding: 2.5rem; overflow-x: auto;">
-        <h3 style="color: #fff; font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; text-align: center;">
-          Platform Comparison: TARAK vs Kubernetes vs K3s
-        </h3>
+    <!-- Comparison Table -->
+    <section style="margin-bottom: 4.5rem; position: relative; z-index: 1;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: 2rem; font-weight: 700; color: #fff;">Architectural Comparison</h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">See how TARAK outperforms existing heavy orchestrators.</p>
+      </div>
+
+      <div class="card" style="overflow-x: auto; padding: 0;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem;">
           <thead>
-            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--accent-cyan);">
-              <th style="padding: 1rem;">Feature</th>
-              <th style="padding: 1rem; color: var(--accent-cyan); font-weight: 800;">TARAK</th>
-              <th style="padding: 1rem; color: #94a3b8;">K3s</th>
-              <th style="padding: 1rem; color: #94a3b8;">Kubernetes (k8s)</th>
+            <tr style="border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.02);">
+              <th style="padding: 1.25rem; color: #fff; font-weight: 700;">Feature / Metric</th>
+              <th style="padding: 1.25rem; color: var(--accent-cyan); font-weight: 700;">TARAK</th>
+              <th style="padding: 1.25rem; color: #94a3b8; font-weight: 600;">K3s</th>
+              <th style="padding: 1.25rem; color: #94a3b8; font-weight: 600;">Standard Kubernetes</th>
             </tr>
           </thead>
-          <tbody style="color: var(--text-secondary);">
+          <tbody>
             <tr style="border-bottom: 1px solid var(--border-glass);">
-              <td style="padding: 1rem; color: #fff; font-weight: 600;">Idle RAM Usage</td>
-              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">~22 MB</td>
-              <td style="padding: 1rem;">~512 MB</td>
-              <td style="padding: 1rem;">~2048 MB+</td>
+              <td style="padding: 1rem 1.25rem; font-weight: 600; color: #fff;">Idle Memory Footprint</td>
+              <td style="padding: 1rem 1.25rem; color: var(--accent-emerald); font-weight: 700;">~22 MB</td>
+              <td style="padding: 1rem 1.25rem; color: #cbd5e1;">~512 MB</td>
+              <td style="padding: 1rem 1.25rem; color: #cbd5e1;">~2048 MB+</td>
             </tr>
             <tr style="border-bottom: 1px solid var(--border-glass);">
-              <td style="padding: 1rem; color: #fff; font-weight: 600;">Cold Startup Time</td>
-              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">&lt; 180 ms</td>
-              <td style="padding: 1rem;">15 - 30 seconds</td>
-              <td style="padding: 1rem;">60 - 120 seconds</td>
+              <td style="padding: 1rem 1.25rem; font-weight: 600; color: #fff;">Cold Start Time</td>
+              <td style="padding: 1rem 1.25rem; color: var(--accent-emerald); font-weight: 700;">&lt; 180ms</td>
+              <td style="padding: 1rem 1.25rem; color: #cbd5e1;">15 – 30s</td>
+              <td style="padding: 1rem 1.25rem; color: #cbd5e1;">60 – 120s</td>
             </tr>
             <tr style="border-bottom: 1px solid var(--border-glass);">
-              <td style="padding: 1rem; color: #fff; font-weight: 600;">External Daemons Required</td>
-              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">0 (Zero)</td>
-              <td style="padding: 1rem;">containerd, CNI</td>
-              <td style="padding: 1rem;">etcd, containerd, CNI, CRI</td>
+              <td style="padding: 1rem 1.25rem; font-weight: 600; color: #fff;">External Daemons</td>
+              <td style="padding: 1rem 1.25rem; color: var(--accent-cyan); font-weight: 700;">Zero (Pure Go)</td>
+              <td style="padding: 1rem 1.25rem;">containerd, flannel</td>
+              <td style="padding: 1rem 1.25rem;">etcd, containerd, cni, coredns</td>
             </tr>
             <tr style="border-bottom: 1px solid var(--border-glass);">
-              <td style="padding: 1rem; color: #fff; font-weight: 600;">Cloudflare Tunnels</td>
-              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">Inbuilt Native</td>
-              <td style="padding: 1rem;">Manual Setup</td>
-              <td style="padding: 1rem;">Manual Ingress Operator</td>
+              <td style="padding: 1rem 1.25rem; font-weight: 600; color: #fff;">Public Ingress / Tunnels</td>
+              <td style="padding: 1rem 1.25rem; color: var(--accent-cyan); font-weight: 700;">Inbuilt Cloudflare / Tailscale</td>
+              <td style="padding: 1rem 1.25rem;">Manual Traefik Config</td>
+              <td style="padding: 1rem 1.25rem;">External Ingress Controller</td>
             </tr>
             <tr>
-              <td style="padding: 1rem; color: #fff; font-weight: 600;">Embedded Glassmorphic UI</td>
-              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">Included in Binary</td>
-              <td style="padding: 1rem;">None (3rd Party)</td>
-              <td style="padding: 1rem;">K8s Dashboard (Complex)</td>
+              <td style="padding: 1rem 1.25rem; font-weight: 600; color: #fff;">Built-in Web Dashboard</td>
+              <td style="padding: 1rem 1.25rem; color: var(--accent-emerald); font-weight: 700;">Next.js 16 Embedded</td>
+              <td style="padding: 1rem 1.25rem;">None</td>
+              <td style="padding: 1rem 1.25rem;">K8s Dashboard (Complex)</td>
             </tr>
           </tbody>
         </table>
