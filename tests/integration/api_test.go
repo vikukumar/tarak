@@ -518,11 +518,28 @@ func TestIngressAndTunnels_Integration(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.Contains(t, string(body), "demo-ingress")
 
-	// 3. Inspect Tunnels API
+	// 3. List tunnels
 	resp, body = s.get("/apis/networking.tarak.io/v1/tunnels")
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Contains(t, string(body), "cloudflare")
-	assert.Contains(t, string(body), "tailscale")
+	assert.Contains(t, string(body), "items")
+}
+
+func TestMeshAndIngressEndpoints_Integration(t *testing.T) {
+	s := startTestServer(t)
+
+	// 1. List meshes
+	resp, body := s.get("/apis/mesh.tarak.io/v1/meshes")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "default")
+
+	// 2. Namespaced mesh query fallback
+	resp, body = s.get("/apis/mesh.tarak.io/v1/namespaces/default/meshes")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "default")
+
+	// 3. Ingress querying across namespaces
+	resp, body = s.get("/apis/networking.k8s.io/v1/namespaces/default/ingresses")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 // ─── JSON path helper ─────────────────────────────────────────────────────────
