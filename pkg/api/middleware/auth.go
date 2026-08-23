@@ -82,14 +82,20 @@ func isPublicPath(p string) bool {
 		return true
 	}
 	// Embedded UI and assets
-	if p == "/dashboard" || strings.HasPrefix(p, "/dashboard/") || strings.HasPrefix(p, "/assets/") {
+	if p == "/dashboard" || strings.HasPrefix(p, "/dashboard/") ||
+		p == "/login" || strings.HasPrefix(p, "/login/") ||
+		p == "/setup" || strings.HasPrefix(p, "/setup/") ||
+		p == "/signup" || strings.HasPrefix(p, "/signup/") ||
+		p == "/forgot-password" || strings.HasPrefix(p, "/forgot-password/") ||
+		strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/_next/") {
 		return true
 	}
 	// Auth, Setup & SSO login endpoints
 	if strings.HasPrefix(p, "/apis/auth.tarak.io/v1/login") ||
 		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/setup") ||
 		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/status") ||
-		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/providers") {
+		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/providers") ||
+		strings.HasPrefix(p, "/apis/ws.tarak.io/v1/") {
 		return true
 	}
 	return false

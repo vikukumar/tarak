@@ -62,6 +62,7 @@ import (
 	"github.com/vikukumar/tarak/internal/tunnel"
 	"github.com/vikukumar/tarak/internal/ui"
 	"github.com/vikukumar/tarak/internal/version"
+	"github.com/vikukumar/tarak/internal/ws"
 	"github.com/vikukumar/tarak/internal/zerotrust"
 	"github.com/vikukumar/tarak/pkg/api/handler"
 	"github.com/vikukumar/tarak/pkg/api/middleware"
@@ -141,6 +142,7 @@ type Server struct {
 	meshEngine      *mesh.Engine
 	multiMeshMgr    *mesh.MultiMeshManager
 	zeroTrustMgr    *zerotrust.Manager
+	wsHub           *ws.Hub
 }
 
 // New creates a new Server from the given configuration.
@@ -175,6 +177,7 @@ func New(cfg Config) (*Server, error) {
 	meshEngine := mesh.NewEngine(cfg.Log)
 	multiMeshMgr := mesh.NewMultiMeshManager(cfg.Log)
 	zeroTrustMgr := zerotrust.NewManager(cfg.Log)
+	wsHub := ws.NewHub(cfg.Log)
 
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
@@ -196,6 +199,7 @@ func New(cfg Config) (*Server, error) {
 		meshEngine:      meshEngine,
 		multiMeshMgr:    multiMeshMgr,
 		zeroTrustMgr:    zeroTrustMgr,
+		wsHub:           wsHub,
 	}
 	return s, nil
 }
@@ -417,9 +421,22 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Delete("/namespaces/{namespace}/policies/{name}", s.zeroTrustMgr.HandleDeletePolicy)
 	})
 
+	// ── Live WebSocket Streaming Hub (Real-time cluster telemetry & Hubble) ─
+	r.Get("/apis/ws.tarak.io/v1/live", s.wsHub.ServeHTTP)
+	s.wsHub.Start()
+
 	// ── Inbuilt Cluster Dashboard SPA Handlers ────────────────────────────
 	r.Handle("/dashboard", ui.Handler())
 	r.Handle("/dashboard/*", ui.Handler())
+	r.Handle("/login", ui.Handler())
+	r.Handle("/login/*", ui.Handler())
+	r.Handle("/setup", ui.Handler())
+	r.Handle("/setup/*", ui.Handler())
+	r.Handle("/signup", ui.Handler())
+	r.Handle("/signup/*", ui.Handler())
+	r.Handle("/forgot-password", ui.Handler())
+	r.Handle("/forgot-password/*", ui.Handler())
+	r.Handle("/_next/*", ui.Handler())
 	r.Handle("/assets/*", ui.Handler())
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = "/assets/tarak_icon.jpg"
