@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Server, RefreshCw, Plus, FileCode, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
-import { Badge } from "@/components/ui/Badge";
 import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
@@ -16,6 +17,8 @@ export default function ServicesPage() {
   const [services, setServices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<any | null>(null);
+  const [svcToDelete, setSvcToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchServices = async () => {
     setIsLoading(true);
@@ -35,14 +38,20 @@ export default function ServicesPage() {
     fetchServices();
   }, [selectedNamespace]);
 
-  const handleDelete = async (svc: any) => {
-    const ns = svc.metadata?.namespace || selectedNamespace;
-    const name = svc.metadata?.name;
-    if (!confirm(`Delete service "${name}" in namespace "${ns}"?`)) return;
-    await tarakFetch(`/api/v1/namespaces/${ns}/services/${name}`, {
-      method: "DELETE",
-    });
-    fetchServices();
+  const confirmDelete = async () => {
+    if (!svcToDelete) return;
+    setIsDeleting(true);
+    try {
+      const ns = svcToDelete.metadata?.namespace || selectedNamespace;
+      const name = svcToDelete.metadata?.name;
+      await tarakFetch(`/api/v1/namespaces/${ns}/services/${name}`, {
+        method: "DELETE",
+      });
+      setSvcToDelete(null);
+      fetchServices();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<any>[] = [
@@ -135,7 +144,7 @@ export default function ServicesPage() {
             <FileCode size={14} />
           </button>
           <button
-            onClick={() => handleDelete(svc)}
+            onClick={() => setSvcToDelete(svc)}
             className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Service"
           >
@@ -200,6 +209,17 @@ export default function ServicesPage() {
         namespace={selectedService?.metadata?.namespace || selectedNamespace}
         rawResource={selectedService}
         onActionComplete={fetchServices}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!svcToDelete}
+        onClose={() => setSvcToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Service"
+        message={`Are you sure you want to delete service "${svcToDelete?.metadata?.name}" from namespace "${svcToDelete?.metadata?.namespace || selectedNamespace}"? Active proxy forwarders and MetalLB external IP bindings will be released immediately.`}
+        confirmText="Delete Service"
+        isLoading={isDeleting}
       />
     </div>
   );

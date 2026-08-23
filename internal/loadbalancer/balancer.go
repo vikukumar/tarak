@@ -43,6 +43,17 @@ func (f *Forwarder) UpdateServiceRoutes(ctx context.Context, listenAddr string, 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if len(endpoints) == 0 {
+		if ln, ok := f.listeners[listenAddr]; ok {
+			_ = ln.Close()
+			delete(f.listeners, listenAddr)
+			delete(f.endpoints, listenAddr)
+			delete(f.rrCounter, listenAddr)
+			f.log.Info("closed loadbalancer listener with 0 endpoints", zap.String("listenAddr", listenAddr))
+		}
+		return nil
+	}
+
 	f.endpoints[listenAddr] = endpoints
 	if _, ok := f.rrCounter[listenAddr]; !ok {
 		var zero uint64
@@ -66,6 +77,61 @@ func (f *Forwarder) UpdateServiceRoutes(ctx context.Context, listenAddr string, 
 
 	go f.acceptLoop(ctx, listenAddr, ln)
 	return nil
+}
+
+// RemoveServiceRoute closes the listener and clears routes for a specific address.
+func (f *Forwarder) RemoveServiceRoute(listenAddr string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if ln, ok := f.listeners[listenAddr]; ok {
+		_ = ln.Close()
+		delete(f.listeners, listenAddr)
+		delete(f.endpoints, listenAddr)
+		delete(f.rrCounter, listenAddr)
+		f.log.Info("removed loadbalancer proxy listener", zap.String("listenAddr", listenAddr))
+	}
+}
+
+// SyncAllRoutes updates active routes and closes any listeners no longer in desired set.
+func (f *Forwarder) SyncAllRoutes(ctx context.Context, desiredRoutes map[string][]Endpoint) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// 1. Close listeners no longer in desired set or having 0 endpoints
+	for addr, ln := range f.listeners {
+		eps, ok := desiredRoutes[addr]
+		if !ok || len(eps) == 0 {
+			f.log.Info("closing obsolete loadbalancer proxy listener", zap.String("listenAddr", addr))
+			_ = ln.Close()
+			delete(f.listeners, addr)
+			delete(f.endpoints, addr)
+			delete(f.rrCounter, addr)
+		}
+	}
+
+	// 2. Open or update desired routes with active endpoints
+	for addr, eps := range desiredRoutes {
+		if len(eps) == 0 {
+			continue
+		}
+		f.endpoints[addr] = eps
+		if _, ok := f.rrCounter[addr]; !ok {
+			var zero uint64
+			f.rrCounter[addr] = &zero
+		}
+
+		if _, ok := f.listeners[addr]; !ok {
+			ln, err := net.Listen("tcp", addr)
+			if err != nil {
+				f.log.Warn("failed to start listener for route", zap.String("listenAddr", addr), zap.Error(err))
+				continue
+			}
+			f.listeners[addr] = ln
+			f.log.Info("started bare-metal loadbalancer listener", zap.String("listenAddr", addr), zap.Int("endpoints", len(eps)))
+			go f.acceptLoop(ctx, addr, ln)
+		}
+	}
 }
 
 func (f *Forwarder) acceptLoop(ctx context.Context, listenAddr string, ln net.Listener) {

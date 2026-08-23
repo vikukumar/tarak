@@ -181,7 +181,7 @@ func (m *Manager) reconcileDeployments(ctx context.Context, group, version strin
 			}
 		}
 
-		// Create missing pods
+		// Create missing pods (Scale Up)
 		currentCount := int32(len(matchingPods))
 		if currentCount < replicas {
 			for i := currentCount; i < replicas; i++ {
@@ -225,10 +225,35 @@ func (m *Manager) reconcileDeployments(ctx context.Context, group, version strin
 					}
 					if createdEnv, err := m.store.Create(ctx, key, podRaw); err == nil {
 						matchingPods = append(matchingPods, createdEnv)
-						m.log.Info("deployment controller created pod", zap.String("deployment", name), zap.String("pod", podName))
+						m.log.Info("deployment controller created pod (scaled up)", zap.String("deployment", name), zap.String("pod", podName))
 					}
 				}
 			}
+		} else if currentCount > replicas {
+			// Descale / Delete excess pods (Scale Down)
+			excess := currentCount - replicas
+			for i := int32(0); i < excess && i < int32(len(matchingPods)); i++ {
+				idx := len(matchingPods) - 1 - int(i)
+				pe := matchingPods[idx]
+				var pObj map[string]interface{}
+				_ = json.Unmarshal(pe.Object, &pObj)
+				pMeta, _ := pObj["metadata"].(map[string]interface{})
+				pName, _ := pMeta["name"].(string)
+
+				pKey := statestore.ResourceKey{
+					Group:     "",
+					Version:   "v1",
+					Resource:  "pods",
+					Namespace: ns,
+					Name:      pName,
+				}
+				_, _ = m.store.Delete(ctx, pKey, 0)
+				if m.runtime != nil {
+					_ = m.runtime.StopPodContainers(ctx, ns, pName)
+				}
+				m.log.Info("deployment controller deleted excess pod (scaled down)", zap.String("deployment", name), zap.String("pod", pName))
+			}
+			matchingPods = matchingPods[:replicas]
 		}
 
 		// Count ready pods
@@ -315,6 +340,29 @@ func (m *Manager) reconcilePods(ctx context.Context) {
 		_, _ = fmt.Fprintf(os.Stderr, "[controller] FATAL: pod list failed: %v\n", listErr)
 		return
 	}
+
+	activePods := make(map[string]bool)
+	for _, env := range podEnvs {
+		var pod map[string]interface{}
+		if err := json.Unmarshal(env.Object, &pod); err == nil {
+			if meta, _ := pod["metadata"].(map[string]interface{}); meta != nil {
+				nm, _ := meta["name"].(string)
+				ns, _ := meta["namespace"].(string)
+				if ns == "" {
+					ns = "default"
+				}
+				if nm != "" {
+					activePods[ns+"/"+nm] = true
+				}
+			}
+		}
+	}
+
+	// Always cleanup containers for pods that were deleted from statestore
+	if m.runtime != nil {
+		m.runtime.CleanupDeletedPods(ctx, activePods)
+	}
+
 	if len(podEnvs) == 0 {
 		return
 	}
@@ -637,6 +685,13 @@ func (m *Manager) recordEvent(ctx context.Context, ns, kind, name, reason, messa
 // ─── Service & MetalLB Controller ─────────────────────────────────────────────
 
 func (m *Manager) reconcileServices(ctx context.Context, group, version string) {
+	desiredRoutes := make(map[string][]loadbalancer.Endpoint)
+	defer func() {
+		if m.lbCtrl != nil {
+			m.lbCtrl.SyncAllServiceForwarding(ctx, desiredRoutes)
+		}
+	}()
+
 	svcEnvs, _, err := m.store.List(ctx, statestore.ListQuery{
 		Key: statestore.ResourceKey{Group: group, Version: version, Resource: "services"},
 	})
@@ -665,38 +720,37 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 		svcType, _ := spec["type"].(string)
 		if svcType == "" {
 			svcType = "ClusterIP"
-			spec["type"] = svcType
 		}
 
 		needsUpdate := false
 
-		// 1. Assign ClusterIP if missing
-		clusterIP, _ := spec["clusterIP"].(string)
-		if clusterIP == "" && clusterIP != "None" {
+		// 1. ClusterIP Assignment
+		currClusterIP, _ := spec["clusterIP"].(string)
+		if currClusterIP == "" {
 			spec["clusterIP"] = fmt.Sprintf("10.96.0.%d", (idx%240)+10)
 			needsUpdate = true
+			m.log.Info("tarak service controller assigned clusterIP", zap.String("service", name), zap.String("clusterIP", spec["clusterIP"].(string)))
 		}
 
-		// 2. Assign nodePorts for NodePort & LoadBalancer services
+		// 2. NodePort Assignment
 		ports, _ := spec["ports"].([]interface{})
 		for pIdx, p := range ports {
 			pMap, ok := p.(map[string]interface{})
 			if !ok {
 				continue
 			}
-			if pMap["protocol"] == nil || pMap["protocol"] == "" {
-				pMap["protocol"] = "TCP"
+			currNP, _ := pMap["nodePort"].(float64)
+			if currNP == 0 && (svcType == "NodePort" || svcType == "LoadBalancer") {
+				pMap["nodePort"] = 30000 + float64(pIdx*10) + float64((idx%50)*100) + 1
+				ports[pIdx] = pMap
 				needsUpdate = true
 			}
-			if svcType == "NodePort" || svcType == "LoadBalancer" {
-				if np, _ := pMap["nodePort"].(float64); np == 0 {
-					pMap["nodePort"] = 30000 + (idx*10) + pIdx + 120
-					needsUpdate = true
-				}
-			}
+		}
+		if needsUpdate {
+			spec["ports"] = ports
 		}
 
-		// 3. MetalLB / Public IP LoadBalancer allocation & Live TCP Forwarding
+		// 3. Endpoint Resolution & Dynamic IP Allocation
 		var endpoints []loadbalancer.Endpoint
 		selector, _ := spec["selector"].(map[string]interface{})
 		if selector != nil {
@@ -786,7 +840,7 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 		}
 
 		// 4. Live TCP Proxy Forwarding to Host
-		if m.lbCtrl != nil && len(endpoints) > 0 {
+		if len(endpoints) > 0 {
 			for _, p := range ports {
 				pMap, ok := p.(map[string]interface{})
 				if !ok {
@@ -797,11 +851,11 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 
 				if np > 0 {
 					listenAddr := fmt.Sprintf("0.0.0.0:%d", int(np))
-					_ = m.lbCtrl.SyncServiceForwarding(ctx, listenAddr, endpoints)
+					desiredRoutes[listenAddr] = endpoints
 				}
 				if svcType == "LoadBalancer" && svcPort > 0 {
 					listenAddr := fmt.Sprintf("0.0.0.0:%d", int(svcPort))
-					_ = m.lbCtrl.SyncServiceForwarding(ctx, listenAddr, endpoints)
+					desiredRoutes[listenAddr] = endpoints
 				}
 			}
 		}

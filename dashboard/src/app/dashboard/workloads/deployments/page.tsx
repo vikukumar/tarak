@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
 import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
@@ -27,6 +28,8 @@ export default function DeploymentsPage() {
   const [selectedDeployment, setSelectedDeployment] = useState<any | null>(null);
   const [scaleDeployment, setScaleDeployment] = useState<any | null>(null);
   const [scaleCount, setScaleCount] = useState(1);
+  const [depToDelete, setDepToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchDeployments = async () => {
     setIsLoading(true);
@@ -65,14 +68,20 @@ export default function DeploymentsPage() {
     fetchDeployments();
   };
 
-  const handleDelete = async (dep: any) => {
-    const ns = dep.metadata?.namespace || selectedNamespace;
-    const name = dep.metadata?.name;
-    if (!confirm(`Delete deployment "${name}" in namespace "${ns}"?`)) return;
-    await tarakFetch(`/apis/apps/v1/namespaces/${ns}/deployments/${name}`, {
-      method: "DELETE",
-    });
-    fetchDeployments();
+  const confirmDelete = async () => {
+    if (!depToDelete) return;
+    setIsDeleting(true);
+    try {
+      const ns = depToDelete.metadata?.namespace || selectedNamespace;
+      const name = depToDelete.metadata?.name;
+      await tarakFetch(`/apis/apps/v1/namespaces/${ns}/deployments/${name}`, {
+        method: "DELETE",
+      });
+      setDepToDelete(null);
+      fetchDeployments();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<any>[] = [
@@ -153,7 +162,7 @@ export default function DeploymentsPage() {
             <FileCode size={14} />
           </button>
           <button
-            onClick={() => handleDelete(d)}
+            onClick={() => setDepToDelete(d)}
             className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Deployment"
           >
@@ -246,6 +255,17 @@ export default function DeploymentsPage() {
         namespace={selectedDeployment?.metadata?.namespace || selectedNamespace}
         rawResource={selectedDeployment}
         onActionComplete={fetchDeployments}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!depToDelete}
+        onClose={() => setDepToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Deployment"
+        message={`Are you sure you want to delete deployment "${depToDelete?.metadata?.name}" from namespace "${depToDelete?.metadata?.namespace || selectedNamespace}"? All child pods and running containers will be descaled and terminated.`}
+        confirmText="Delete Deployment"
+        isLoading={isDeleting}
       />
     </div>
   );

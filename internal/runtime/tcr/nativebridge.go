@@ -313,9 +313,10 @@ func startBuiltinHTTPServer(ctx context.Context, id, webRoot string, port int, l
 	// Shutdown on context cancel
 	go func() {
 		<-containerCtx.Done()
-		timeoutCtx, tc := context.WithTimeout(context.Background(), 5*time.Second)
+		timeoutCtx, tc := context.WithTimeout(context.Background(), 2*time.Second)
 		defer tc()
 		_ = srv.Shutdown(timeoutCtx)
+		_ = listener.Close()
 	}()
 
 	_ = actualPort

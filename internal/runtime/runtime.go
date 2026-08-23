@@ -133,6 +133,7 @@ type Runtime interface {
 	PullImage(ctx context.Context, image string) (*PullResult, error)
 	RunPodContainers(ctx context.Context, spec PodRuntimeSpec) (map[string]*ContainerInfo, error)
 	StopPodContainers(ctx context.Context, ns, podName string) error
+	CleanupDeletedPods(ctx context.Context, activePods map[string]bool)
 	GetContainerInfo(ctx context.Context, ns, podName, containerName string) (*ContainerInfo, error)
 	GetHostPort(ns, podName string, targetPort int) int
 	DialPod(ctx context.Context, ns, podName string, targetPort int) (net.Conn, error)
@@ -786,18 +787,54 @@ func (e *Engine) StopPodContainers(ctx context.Context, ns, podName string) erro
 	prefix := fmt.Sprintf("%s/%s/", ns, podName)
 	for key, info := range e.containers {
 		if strings.HasPrefix(key, prefix) {
+			cID := fmt.Sprintf("tarak-%s-%s-%s", ns, podName, info.Name)
 			if e.hasRuntime && info.DockerID != "" {
-				cID := fmt.Sprintf("tarak-%s-%s-%s", ns, podName, info.Name)
 				_ = exec.CommandContext(ctx, e.runtimePath, "stop", "-t", "2", cID).Run()
 				_ = exec.CommandContext(ctx, e.runtimePath, "rm", "-f", cID).Run()
+			} else if e.tcrEngine != nil {
+				_ = e.tcrEngine.StopContainer(cID)
+			}
+			if info.SandboxPID > 0 {
+				if p, err := os.FindProcess(info.SandboxPID); err == nil {
+					_ = p.Kill()
+				}
+			}
+			// Close any dedicated port forwarding listeners
+			if ln, ok := e.listeners[key]; ok {
+				_ = ln.Close()
+				delete(e.listeners, key)
 			}
 			info.State = StateTerminated
 			info.FinishedAt = time.Now().UTC()
 			delete(e.containers, key)
+			e.log.Info("stopped and cleaned up pod containers", zap.String("namespace", ns), zap.String("pod", podName), zap.String("container", info.Name))
 		}
 	}
 
 	return nil
+}
+
+// CleanupDeletedPods compares tracked containers against the active pods set and stops any orphaned containers.
+func (e *Engine) CleanupDeletedPods(ctx context.Context, activePods map[string]bool) {
+	e.mu.RLock()
+	var podsToStop [][2]string
+	seenPods := make(map[string]bool)
+	for key := range e.containers {
+		parts := strings.Split(key, "/")
+		if len(parts) >= 2 {
+			podKey := parts[0] + "/" + parts[1]
+			if !activePods[podKey] && !seenPods[podKey] {
+				seenPods[podKey] = true
+				podsToStop = append(podsToStop, [2]string{parts[0], parts[1]})
+			}
+		}
+	}
+	e.mu.RUnlock()
+
+	for _, p := range podsToStop {
+		e.log.Info("cleaning up containers for deleted pod", zap.String("ns", p[0]), zap.String("pod", p[1]))
+		_ = e.StopPodContainers(ctx, p[0], p[1])
+	}
 }
 
 // GetContainerInfo returns metadata for a given container.

@@ -82,6 +82,16 @@ func (c *Controller) SyncServiceForwarding(ctx context.Context, listenAddr strin
 	return c.forwarder.UpdateServiceRoutes(ctx, listenAddr, endpoints)
 }
 
+// SyncAllServiceForwarding synchronizes all active routes and closes listeners for deleted services.
+func (c *Controller) SyncAllServiceForwarding(ctx context.Context, desiredRoutes map[string][]Endpoint) {
+	c.forwarder.SyncAllRoutes(ctx, desiredRoutes)
+}
+
+// RemoveServiceForwarding closes listeners for a specific address.
+func (c *Controller) RemoveServiceForwarding(listenAddr string) {
+	c.forwarder.RemoveServiceRoute(listenAddr)
+}
+
 // PublicIP returns the active detected public WAN IP.
 func (c *Controller) PublicIP() string {
 	if c.publicIP != "" {

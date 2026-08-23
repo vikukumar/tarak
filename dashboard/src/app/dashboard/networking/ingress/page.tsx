@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
@@ -16,6 +17,8 @@ export default function IngressPage() {
   const [ingresses, setIngresses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIngress, setSelectedIngress] = useState<any | null>(null);
+  const [ingToDelete, setIngToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchIngresses = async () => {
     setIsLoading(true);
@@ -35,14 +38,20 @@ export default function IngressPage() {
     fetchIngresses();
   }, [selectedNamespace]);
 
-  const handleDelete = async (ing: any) => {
-    const ns = ing.metadata?.namespace || selectedNamespace;
-    const name = ing.metadata?.name;
-    if (!confirm(`Delete ingress "${name}" in namespace "${ns}"?`)) return;
-    await tarakFetch(`/apis/networking.k8s.io/v1/namespaces/${ns}/ingresses/${name}`, {
-      method: "DELETE",
-    });
-    fetchIngresses();
+  const confirmDelete = async () => {
+    if (!ingToDelete) return;
+    setIsDeleting(true);
+    try {
+      const ns = ingToDelete.metadata?.namespace || selectedNamespace;
+      const name = ingToDelete.metadata?.name;
+      await tarakFetch(`/apis/networking.k8s.io/v1/namespaces/${ns}/ingresses/${name}`, {
+        method: "DELETE",
+      });
+      setIngToDelete(null);
+      fetchIngresses();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<any>[] = [
@@ -121,7 +130,7 @@ export default function IngressPage() {
             <FileCode size={14} />
           </button>
           <button
-            onClick={() => handleDelete(ing)}
+            onClick={() => setIngToDelete(ing)}
             className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Ingress"
           >
@@ -186,6 +195,17 @@ export default function IngressPage() {
         namespace={selectedIngress?.metadata?.namespace || selectedNamespace}
         rawResource={selectedIngress}
         onActionComplete={fetchIngresses}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!ingToDelete}
+        onClose={() => setIngToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Ingress"
+        message={`Are you sure you want to delete ingress "${ingToDelete?.metadata?.name}" from namespace "${ingToDelete?.metadata?.namespace || selectedNamespace}"? Virtual routing paths and reverse proxy configs will be removed immediately.`}
+        confirmText="Delete Ingress"
+        isLoading={isDeleting}
       />
     </div>
   );

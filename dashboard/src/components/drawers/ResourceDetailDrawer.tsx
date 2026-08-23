@@ -19,6 +19,7 @@ import {
   Box,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { tarakFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -42,20 +43,35 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   onActionComplete,
 }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "yaml" | "logs" | "events">("overview");
+  const [copiedYaml, setCopiedYaml] = useState(false);
   const [logs, setLogs] = useState<string>("");
-  const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
-  const [copiedYaml, setCopiedYaml] = useState<boolean>(false);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Fetch logs for pods
   useEffect(() => {
-    if (!isOpen || activeTab !== "logs" || resourceType.toLowerCase() !== "pod") return;
+    if (!isOpen || activeTab !== "logs") return;
 
     async function fetchLogs() {
       setLoadingLogs(true);
       try {
-        const res = await tarakFetch(`/api/v1/namespaces/${namespace}/pods/${resourceName}/log`);
-        setLogs(typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2) || "No container output logs recorded yet.");
+        let logUrl = "";
+        if (resourceType.toLowerCase() === "pod") {
+          logUrl = `/api/v1/namespaces/${namespace}/pods/${resourceName}/log?tailLines=200`;
+        } else {
+          setLogs("Logs only directly available for Pods. Checking related pods...");
+          return;
+        }
+
+        const res = await tarakFetch(logUrl);
+        if (typeof res === "string") {
+          setLogs(res || "No logs available for this container yet.");
+        } else if (res?.data) {
+          setLogs(typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2));
+        } else {
+          setLogs("No stdout/stderr records streamed yet.");
+        }
       } catch (err: any) {
         setLogs(`Error fetching logs: ${err?.message || "Failed to connect to runtime"}`);
       } finally {
@@ -78,8 +94,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     setTimeout(() => setCopiedYaml(false), 2000);
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${resourceType} "${resourceName}"?`)) return;
+  const confirmDeleteResource = async () => {
     setIsDeleting(true);
     try {
       let endpoint = "";
@@ -94,6 +109,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       if (endpoint) {
         await tarakFetch(endpoint, { method: "DELETE" });
         if (onActionComplete) onActionComplete();
+        setShowDeleteModal(false);
         onClose();
       }
     } finally {
@@ -136,7 +152,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteModal(true)}
               disabled={isDeleting}
               className="p-2 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 transition-colors text-xs flex items-center gap-1.5"
               title="Delete Resource"
@@ -366,6 +382,17 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           )}
         </div>
       </div>
+
+      {/* Modern Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDeleteResource}
+        title={`Delete ${resourceType}`}
+        message={`Are you sure you want to delete ${resourceType} "${resourceName}" from namespace "${namespace}"? Any associated pods, containers, and live network forwarders will be terminated immediately.`}
+        confirmText={`Delete ${resourceType}`}
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

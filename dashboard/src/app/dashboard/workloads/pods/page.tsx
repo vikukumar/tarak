@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
@@ -25,6 +26,8 @@ export default function PodsPage() {
   const [pods, setPods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPod, setSelectedPod] = useState<any | null>(null);
+  const [podToDelete, setPodToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchPods = async () => {
     setIsLoading(true);
@@ -44,14 +47,20 @@ export default function PodsPage() {
     fetchPods();
   }, [selectedNamespace]);
 
-  const handleDelete = async (pod: any) => {
-    const ns = pod.metadata?.namespace || selectedNamespace;
-    const name = pod.metadata?.name;
-    if (!confirm(`Delete pod "${name}" in namespace "${ns}"?`)) return;
-    await tarakFetch(`/api/v1/namespaces/${ns}/pods/${name}`, {
-      method: "DELETE",
-    });
-    fetchPods();
+  const confirmDelete = async () => {
+    if (!podToDelete) return;
+    setIsDeleting(true);
+    try {
+      const ns = podToDelete.metadata?.namespace || selectedNamespace;
+      const name = podToDelete.metadata?.name;
+      await tarakFetch(`/api/v1/namespaces/${ns}/pods/${name}`, {
+        method: "DELETE",
+      });
+      setPodToDelete(null);
+      fetchPods();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<any>[] = [
@@ -151,7 +160,7 @@ export default function PodsPage() {
             <FileCode size={14} />
           </button>
           <button
-            onClick={() => handleDelete(p)}
+            onClick={() => setPodToDelete(p)}
             className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Pod"
           >
@@ -219,6 +228,17 @@ export default function PodsPage() {
         namespace={selectedPod?.metadata?.namespace || selectedNamespace}
         rawResource={selectedPod}
         onActionComplete={fetchPods}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!podToDelete}
+        onClose={() => setPodToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Pod"
+        message={`Are you sure you want to terminate and delete pod "${podToDelete?.metadata?.name}" from namespace "${podToDelete?.metadata?.namespace || selectedNamespace}"? The runtime container and host port forwards will be immediately cleaned up.`}
+        confirmText="Delete Pod"
+        isLoading={isDeleting}
       />
     </div>
   );
