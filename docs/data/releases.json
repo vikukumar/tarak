@@ -1,5 +1,25 @@
 [
   {
+    "version": "1.0.6",
+    "tag": "v1.0.6",
+    "date": "2026-08-23",
+    "name": "Tarak v1.0.6 — Real Container Engine & Enterprise UI Expansion",
+    "highlights": [
+      "Native Container Execution Engine auto-detecting Docker, Podman, Windows HCS, and pure TCR Native",
+      "Universal Live Resource Editor with instant replica scaling, container image switcher, and YAML/JSON editor",
+      "6 New Management Modules: DaemonSets, ConfigMaps & Secrets, Network Policies, Diagnostic Events, ServiceAccounts/PKI, and Runtime Explorer",
+      "Dynamic Host LAN & Public IP auto-detection replacing all static bindings with zero configuration",
+      "Embedded Next.js 16 Turbopack glassmorphic dashboard with instant WebSocket event streaming"
+    ],
+    "binaries": [
+      "tarak (Unified Binary)",
+      "tarakctl / taraktl (Kubernetes CLI)",
+      "tarakd (API Server Daemon)",
+      "taraks (Worker Node Daemon)"
+    ],
+    "platforms": ["linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64", "darwin/amd64", "darwin/arm64"]
+  },
+  {
     "version": "1.0.1",
     "tag": "v1.0.1",
     "date": "2026-08-23",

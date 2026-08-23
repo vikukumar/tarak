@@ -13,6 +13,7 @@ on:
       - master
     paths:
       - 'docs/**'
+      - 'web/**'
       - 'dashboard/**'
       - '.github/workflows/pages.yml'
   release:
@@ -37,6 +38,28 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build & Sync Web Assets into Docs
+        run: |
+          echo "Building & Synchronizing Documentation Portal..."
+          mkdir -p docs/assets docs/data
+
+          # Sync any assets from web/public into docs
+          if [ -d "web/public" ]; then
+            echo "Copying web/public assets into docs..."
+            cp -r web/public/* docs/ 2>/dev/null || true
+          fi
+
+          # Ensure CNAME is set for custom domain
+          if [ ! -f "docs/CNAME" ]; then
+            echo "tarak.vikshro.in" > docs/CNAME
+          fi
+
+          echo "Documentation assets prepared:"
+          ls -la docs/
+          ls -la docs/assets/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

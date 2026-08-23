@@ -1,104 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/android-chrome-192x192.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
-  <link rel="manifest" href="site.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Primary Meta Tags -->
   <title>TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative</title>
   <meta name="title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
-  <meta name="description"
-    content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than Kubernetes and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
-  <meta name="keywords"
-    content="tarak, kubernetes alternative, k8s, k3s, container orchestration, go container runtime, cloudflare tunnel, tailscale mesh, lightweight kubernetes, devops, microservices, edge computing" />
+  <meta name="description" content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than Kubernetes and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
+  <meta name="keywords" content="tarak, kubernetes alternative, k8s, k3s, container orchestration, go container runtime, cloudflare tunnel, tailscale mesh, lightweight kubernetes, devops, microservices, edge computing" />
   <meta name="author" content="Viku Kumar (vikshro)" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <link rel="canonical" href="https://tarak.vikshro.in/" />
   <meta name="theme-color" content="#00f0ff" />
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
 
-  <!-- Open Graph / Facebook / LinkedIn -->
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+  <link rel="manifest" href="site.webmanifest" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Open Graph / Social -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://tarak.vikshro.in/" />
   <meta property="og:site_name" content="TARAK Platform" />
   <meta property="og:title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
-  <meta property="og:description"
-    content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than K8s and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
+  <meta property="og:description" content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than K8s and K3s. Inbuilt Cloudflare Tunnels, Tailscale private mesh, zero external daemons." />
   <meta property="og:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="TARAK Container Orchestration Platform" />
-
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content="https://tarak.vikshro.in/" />
   <meta name="twitter:title" content="TARAK — Ultra-Lightweight Zero-Dependency Kubernetes Alternative" />
-  <meta name="twitter:description"
-    content="Next-generation pure Go container orchestrator. 10x faster & 20x lighter than K8s and K3s. Inbuilt Cloudflare Tunnels, Tailscale mesh, zero external daemons." />
+  <meta name="twitter:description" content="Next-generation pure Go container orchestrator. Inbuilt Cloudflare Tunnels & Tailscale mesh." />
   <meta name="twitter:image" content="https://tarak.vikshro.in/assets/tarak_github.jpg" />
-
-  <!-- Structured Data (JSON-LD) for Rich Google Search Snippets -->
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "TARAK",
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Linux, macOS, Windows",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "description": "Ultra-lightweight, zero-dependency container orchestration platform written in pure Go. 10x faster and 20x lighter than Kubernetes and K3s with inbuilt Cloudflare and Tailscale networking.",
-      "url": "https://tarak.vikshro.in/",
-      "image": "https://tarak.vikshro.in/assets/og-image.jpg",
-      "license": "https://opensource.org/licenses/Apache-2.0",
-      "author": {
-        "@type": "Person",
-        "name": "Vikash Kumar",
-        "url": "https://github.com/vikukumar"
-      }
-    }
-    </script>
-  <script type="module" crossorigin src="/assets/index-CZe2aXAb.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BacLvg-2.css">
 </head>
-
 <body>
-  <div id="root">
-    <!-- Semantic SEO Fallback Content for Search Crawlers -->
-    <header>
-      <h1>TARAK — Next-Generation Container Orchestrator</h1>
-      <p>A pure Go, zero-dependency orchestrator that runs anywhere. 10x faster and 20x lighter than Kubernetes & K3s.
-      </p>
-    </header>
-    <main>
-      <section>
-        <h2>Key Features</h2>
-        <ul>
-          <li><strong>Zero External Dependencies:</strong> Runs without Docker Desktop, WSL2, containerd, or etcd.</li>
-          <li><strong>Ultra-Lightweight Footprint:</strong> ~22MB RAM idle consumption with &lt;180ms startup.</li>
-          <li><strong>Inbuilt Cloudflare & Tailscale:</strong> Zero-configuration public HTTPS tunnels and private mesh
-            sharing.</li>
-          <li><strong>Multi-Node Clustering:</strong> Seamless 1 Control Plane + N Worker Nodes across clouds and
-            bare-metal.</li>
-          <li><strong>Kubernetes API Compatibility:</strong> Declarative YAML support for Deployments, Pods, Services,
-            and Ingresses.</li>
-        </ul>
-      </section>
-    </main>
-    <footer>
-      <p>Developed with ❤️ by <a href="https://github.com/vikukumar">@vikukumar</a> • Made in India 🇮🇳</p>
-    </footer>
-  </div>
-</body>
 
+  <!-- Glassmorphic Header -->
+  <header>
+    <a href="index.html" class="logo-container">
+      <img src="assets/tarak_icon.jpg" alt="Tarak Icon" />
+      <span class="logo-text-gradient">TARAK</span>
+    </a>
+    
+    <!-- Desktop Navigation -->
+    <nav class="desktop-nav">
+      <a href="index.html" class="active">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="multi-node.html">Multi-Node</a>
+      <a href="tunnels.html">Tunnels & Ingress</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="cli-reference.html">CLI Reference</a>
+      <a href="releases.html">Releases</a>
+      <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank">⭐ Star on GitHub</a>
+    </nav>
+
+    <!-- Mobile Toggle -->
+    <button class="mobile-toggle" aria-label="Toggle navigation menu">☰</button>
+  </header>
+
+  <!-- Mobile Drawer -->
+  <div class="drawer-backdrop"></div>
+  <aside class="mobile-drawer">
+    <a href="index.html" class="active">🏠 Home</a>
+    <a href="getting-started.html">🚀 Getting Started</a>
+    <a href="multi-node.html">🌐 Multi-Node Clustering</a>
+    <a href="tunnels.html">⚡ Tunnels & Ingress</a>
+    <a href="architecture.html">📐 Architecture</a>
+    <a href="api-reference.html">📡 API Reference</a>
+    <a href="cli-reference.html">💻 CLI Reference</a>
+    <a href="releases.html">📦 Releases & Changelog</a>
+    <a href="https://github.com/vikukumar/tarak" class="btn-github" target="_blank" style="margin-top: 1rem;">⭐ Star on GitHub</a>
+  </aside>
+
+  <main class="container">
+    <!-- Hero Section -->
+    <section class="hero" style="text-align: center; padding: 4rem 0 3rem;">
+      <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+        <span class="badge badge-cyan">v1.0.6 Production Ready</span>
+        <span class="badge badge-purple">Zero-Dependency Pure Go</span>
+      </div>
+
+      <h1 style="font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800; line-height: 1.15; margin-bottom: 1.5rem;">
+        Ultra-Lightweight <br /><span class="hero-gradient-text">Kubernetes Alternative</span>
+      </h1>
+
+      <p style="color: var(--text-secondary); font-size: 1.15rem; max-width: 760px; margin: 0 auto 2.5rem; line-height: 1.7;">
+        A pure Go container orchestrator that runs anywhere with zero external dependencies.
+        <strong>10x faster & 20x lighter than K8s and K3s</strong> with built-in Cloudflare Tunnels, Tailscale Mesh, and declarative YAML APIs.
+      </p>
+
+      <!-- Terminal Quick Installer Box -->
+      <div class="terminal-card" style="max-width: 680px; margin: 0 auto 3rem; text-align: left;">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <div class="terminal-tabs">
+            <button class="terminal-tab active" data-type="bash">Linux / macOS</button>
+            <button class="terminal-tab" data-type="powershell">Windows PowerShell</button>
+            <button class="terminal-tab" data-type="go">Go Client SDK</button>
+          </div>
+        </div>
+        <div class="terminal-body" style="display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem;">
+          <code id="install-cmd" style="font-family: var(--font-mono); color: var(--accent-cyan); font-size: 0.95rem; word-break: break-all;">curl -fsSL https://tarak.vikshro.in/install.sh | bash</code>
+          <button class="btn-copy" onclick="copyInstallCommand()" style="margin-left: 1rem; flex-shrink: 0; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">
+            📋 Copy
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-bottom: 4rem;">
+        <a href="getting-started.html" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #000; font-weight: 700; padding: 0.85rem 1.75rem; border-radius: 12px; text-decoration: none; box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);">
+          ⚡ Get Started in 30 Seconds
+        </a>
+        <a href="architecture.html" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 0.85rem 1.75rem; border-radius: 12px; text-decoration: none;">
+          📐 Explore Architecture
+        </a>
+      </div>
+    </section>
+
+    <!-- Key Advantages Grid -->
+    <section style="margin-bottom: 4.5rem;">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: 2rem; font-weight: 700; color: #fff;">Why Developers Choose TARAK</h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Engineered from scratch for speed, security, and extreme resource efficiency.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">⚡</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Sub-25 MB RAM Footprint</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Runs flawlessly on 512MB VPS, edge devices, Raspberry Pis, or bare-metal servers without eating host resources.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">🔒</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Inbuilt Cloudflare & Tailscale</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Zero-config public HTTPS endpoints with Cloudflare Tunnels and encrypted multi-node mesh via Tailscale WireGuard.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">☸️</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Kubernetes API Compatible</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Apply your existing Kubernetes manifests with <code>tarakctl apply -f</code> for Pods, Deployments, Services, and Ingresses.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">🚀</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Instant Startup (&lt;180ms)</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Zero JVM or heavy runtime overhead. Starts in milliseconds, reconciling workloads immediately on boot.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">🌐</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Multi-Node Cluster Ready</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Connect control planes (<code>tarakd</code>) with worker nodes (<code>taraks</code>) across multi-cloud and bare-metal environments.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">🖥️</div>
+          <h3 style="color: #fff; font-size: 1.25rem; margin-bottom: 0.5rem;">Next.js Glassmorphic UI</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+            Built-in modern web dashboard embedded directly into the binary with real-time metrics, logs, and terminal access.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture & Comparison Table -->
+    <section style="margin-bottom: 4.5rem;">
+      <div class="card" style="padding: 2.5rem; overflow-x: auto;">
+        <h3 style="color: #fff; font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; text-align: center;">
+          Platform Comparison: TARAK vs Kubernetes vs K3s
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--accent-cyan);">
+              <th style="padding: 1rem;">Feature</th>
+              <th style="padding: 1rem; color: var(--accent-cyan); font-weight: 800;">TARAK</th>
+              <th style="padding: 1rem; color: #94a3b8;">K3s</th>
+              <th style="padding: 1rem; color: #94a3b8;">Kubernetes (k8s)</th>
+            </tr>
+          </thead>
+          <tbody style="color: var(--text-secondary);">
+            <tr style="border-bottom: 1px solid var(--border-glass);">
+              <td style="padding: 1rem; color: #fff; font-weight: 600;">Idle RAM Usage</td>
+              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">~22 MB</td>
+              <td style="padding: 1rem;">~512 MB</td>
+              <td style="padding: 1rem;">~2048 MB+</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-glass);">
+              <td style="padding: 1rem; color: #fff; font-weight: 600;">Cold Startup Time</td>
+              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">&lt; 180 ms</td>
+              <td style="padding: 1rem;">15 - 30 seconds</td>
+              <td style="padding: 1rem;">60 - 120 seconds</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-glass);">
+              <td style="padding: 1rem; color: #fff; font-weight: 600;">External Daemons Required</td>
+              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">0 (Zero)</td>
+              <td style="padding: 1rem;">containerd, CNI</td>
+              <td style="padding: 1rem;">etcd, containerd, CNI, CRI</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-glass);">
+              <td style="padding: 1rem; color: #fff; font-weight: 600;">Cloudflare Tunnels</td>
+              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">Inbuilt Native</td>
+              <td style="padding: 1rem;">Manual Setup</td>
+              <td style="padding: 1rem;">Manual Ingress Operator</td>
+            </tr>
+            <tr>
+              <td style="padding: 1rem; color: #fff; font-weight: 600;">Embedded Glassmorphic UI</td>
+              <td style="padding: 1rem; color: var(--accent-emerald); font-weight: 700;">Included in Binary</td>
+              <td style="padding: 1rem;">None (3rd Party)</td>
+              <td style="padding: 1rem;">K8s Dashboard (Complex)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>© 2026 TARAK Container Orchestration Platform. Open source under Apache 2.0.</p>
+    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+      Created with ❤️ by <a href="https://github.com/vikukumar" target="_blank" style="color: var(--accent-cyan);">Viku Kumar (@vikukumar)</a> • Made in India 🇮🇳
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
 </html>
