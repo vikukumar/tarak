@@ -2,7 +2,6 @@
 const nextConfig = {
   output: 'export',
   distDir: 'out',
-  basePath: '/dashboard',
   trailingSlash: true,
   images: {
     unoptimized: true,

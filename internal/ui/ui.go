@@ -12,7 +12,7 @@ import (
 //go:embed dist/*
 var embeddedDist embed.FS
 
-// Handler returns an http.Handler that serves the embedded Next.js dashboard SPA.
+// Handler returns an http.Handler that serves the embedded Next.js dashboard SPA and all its assets.
 func Handler() http.Handler {
 	distFS, err := fs.Sub(embeddedDist, "dist")
 	if err != nil {
@@ -43,46 +43,77 @@ func Handler() http.Handler {
 			_ = f.Close()
 
 			ext := strings.ToLower(filepath.Ext(fsPath))
-			if ext == ".js" {
+			switch ext {
+			case ".js":
 				w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-			} else if ext == ".css" {
+			case ".css":
 				w.Header().Set("Content-Type", "text/css; charset=utf-8")
-			} else if cType := mime.TypeByExtension(ext); cType != "" {
-				w.Header().Set("Content-Type", cType)
+			case ".png":
+				w.Header().Set("Content-Type", "image/png")
+			case ".jpg", ".jpeg":
+				w.Header().Set("Content-Type", "image/jpeg")
+			case ".ico":
+				w.Header().Set("Content-Type", "image/x-icon")
+			case ".svg":
+				w.Header().Set("Content-Type", "image/svg+xml")
+			case ".json", ".webmanifest":
+				w.Header().Set("Content-Type", "application/json")
+			case ".woff2":
+				w.Header().Set("Content-Type", "font/woff2")
+			case ".woff":
+				w.Header().Set("Content-Type", "font/woff")
+			default:
+				if cType := mime.TypeByExtension(ext); cType != "" {
+					w.Header().Set("Content-Type", cType)
+				}
 			}
 
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = "/" + fsPath
 			fileServer.ServeHTTP(w, r2)
 			return true
 		}
 
-		// 1. Direct match for cleanPath (e.g. _next/static/..., assets/..., index.html)
-		if serveDirect(cleanPath) {
-			return
+		// 1. Direct match and asset resolution
+		candidatePaths := []string{
+			cleanPath,
+			strippedPath,
+			"assets/" + cleanPath,
+			"assets/" + strippedPath,
+			strings.TrimPrefix(cleanPath, "assets/"),
+			strings.TrimPrefix(strippedPath, "assets/"),
 		}
 
-		// 2. Direct match for strippedPath (e.g. /dashboard/_next/static/... -> _next/static/...)
-		if strippedPath != cleanPath && serveDirect(strippedPath) {
-			return
+		for _, p := range candidatePaths {
+			if p != "" && serveDirect(p) {
+				return
+			}
 		}
 
-		// 3. For asset files (.js, .css, .jpg, .png, .svg, .woff2, .ico, .map), DO NOT return HTML fallback
+		// 2. For asset files (.js, .css, .jpg, .png, .svg, .woff2, .ico, .map, .webmanifest), DO NOT return HTML fallback
 		ext := strings.ToLower(filepath.Ext(cleanPath))
-		if ext == ".js" || ext == ".css" || ext == ".map" || ext == ".png" || ext == ".jpg" || ext == ".svg" || ext == ".woff2" || ext == ".woff" || ext == ".ico" {
+		if ext == ".js" || ext == ".css" || ext == ".map" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".svg" || ext == ".woff2" || ext == ".woff" || ext == ".ico" || ext == ".webmanifest" {
 			http.NotFound(w, r)
 			return
 		}
 
-		// 4. HTML Page route resolution: check /index.html and .html variants
-		candidates := []string{
-			cleanPath + "/index.html",
-			cleanPath + ".html",
-			strippedPath + "/index.html",
-			strippedPath + ".html",
+		// 3. HTML Page route resolution: check /index.html and .html variants
+		trimmedClean := strings.Trim(cleanPath, "/")
+		trimmedStripped := strings.Trim(strippedPath, "/")
+
+		htmlCandidates := []string{
+			trimmedClean + "/index.html",
+			trimmedClean + ".html",
+			trimmedStripped + "/index.html",
+			trimmedStripped + ".html",
+			"dashboard/" + trimmedClean + "/index.html",
+			"dashboard/" + trimmedClean + ".html",
+			"dashboard/" + trimmedStripped + "/index.html",
+			"dashboard/" + trimmedStripped + ".html",
 		}
 
-		for _, cand := range candidates {
+		for _, cand := range htmlCandidates {
 			if cand == "/index.html" || cand == ".html" {
 				continue
 			}
@@ -94,7 +125,7 @@ func Handler() http.Handler {
 			}
 		}
 
-		// 5. SPA Fallback: serve dashboard/index.html or index.html
+		// 4. SPA Fallback: serve dashboard/index.html or index.html
 		if strings.HasPrefix(reqPath, "/dashboard") {
 			if content, err := fs.ReadFile(distFS, "dashboard/index.html"); err == nil {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")

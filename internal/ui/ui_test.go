@@ -25,16 +25,51 @@ func TestUIHandler_AssetResolution(t *testing.T) {
 		t.Errorf("expected text/html for /dashboard/, got %s", cType)
 	}
 
-	// 2. Test Asset Chunk resolution via /dashboard/_next/static/...
-	reqJS := httptest.NewRequest("GET", "/dashboard/_next/static/chunks/310vm2bl3xxpt.js", nil)
-	recJS := httptest.NewRecorder()
-	handler.ServeHTTP(recJS, reqJS)
+	// 2. Test Direct Icon PNG
+	reqIcon := httptest.NewRequest("GET", "/assets/icon.png", nil)
+	recIcon := httptest.NewRecorder()
+	handler.ServeHTTP(recIcon, reqIcon)
 
-	// Even if specific random hash changes, the content type must never be text/html
-	if recJS.Code == http.StatusOK {
-		jsType := recJS.Header().Get("Content-Type")
-		if strings.Contains(jsType, "text/html") {
-			t.Errorf("JS chunk was returned as text/html! Expected application/javascript, got %s", jsType)
-		}
+	if recIcon.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for /assets/icon.png, got %d", recIcon.Code)
+	}
+	if recIcon.Header().Get("Content-Type") != "image/png" {
+		t.Errorf("expected image/png for icon.png, got %s", recIcon.Header().Get("Content-Type"))
+	}
+
+	// 3. Test Horizontal Logo via /dashboard/assets/...
+	reqLogo := httptest.NewRequest("GET", "/dashboard/assets/tarak_logo_horizontal.png", nil)
+	recLogo := httptest.NewRecorder()
+	handler.ServeHTTP(recLogo, reqLogo)
+
+	if recLogo.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for /dashboard/assets/tarak_logo_horizontal.png, got %d", recLogo.Code)
+	}
+	if recLogo.Header().Get("Content-Type") != "image/png" {
+		t.Errorf("expected image/png for tarak_logo_horizontal.png, got %s", recLogo.Header().Get("Content-Type"))
+	}
+
+	// 4. Test Vertical Logo via /assets/...
+	reqVLogo := httptest.NewRequest("GET", "/assets/tarak_logo_vertical.png", nil)
+	recVLogo := httptest.NewRecorder()
+	handler.ServeHTTP(recVLogo, reqVLogo)
+
+	if recVLogo.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for /assets/tarak_logo_vertical.png, got %d", recVLogo.Code)
+	}
+	if recVLogo.Header().Get("Content-Type") != "image/png" {
+		t.Errorf("expected image/png for tarak_logo_vertical.png, got %s", recVLogo.Header().Get("Content-Type"))
+	}
+
+	// 5. Test Favicon ICO
+	reqFav := httptest.NewRequest("GET", "/favicon.ico", nil)
+	recFav := httptest.NewRecorder()
+	handler.ServeHTTP(recFav, reqFav)
+
+	if recFav.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for /favicon.ico, got %d", recFav.Code)
+	}
+	if recFav.Header().Get("Content-Type") != "image/x-icon" {
+		t.Errorf("expected image/x-icon for favicon.ico, got %s", recFav.Header().Get("Content-Type"))
 	}
 }

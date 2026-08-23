@@ -28,7 +28,7 @@ export default function DashboardShellLayout({
   useEffect(() => {
     if (!loading) {
       if (needsSetup) {
-        window.location.href = "/dashboard/setup/";
+        window.location.href = "/setup/";
       }
     }
   }, [loading, needsSetup]);
@@ -65,14 +65,14 @@ export default function DashboardShellLayout({
           </div>
           <div className="flex flex-col gap-2.5">
             <a
-              href="/dashboard/login/"
+              href="/login/"
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-bold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
             >
               <span>Sign In to Cluster</span>
               <ArrowRight size={14} />
             </a>
             <a
-              href="/dashboard/setup/"
+              href="/setup/"
               className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-white/10 text-slate-300 font-semibold text-xs border border-white/10 transition-colors"
             >
               1st Time Super-Admin Setup

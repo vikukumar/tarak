@@ -438,10 +438,16 @@ func (s *Server) Run(ctx context.Context) error {
 	r.Handle("/forgot-password/*", ui.Handler())
 	r.Handle("/_next/*", ui.Handler())
 	r.Handle("/assets/*", ui.Handler())
-	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = "/assets/tarak_icon.jpg"
-		ui.Handler().ServeHTTP(w, r)
-	})
+	r.Handle("/site.webmanifest", ui.Handler())
+	r.Handle("/manifest.json", ui.Handler())
+	r.Handle("/favicon.ico", ui.Handler())
+	r.Handle("/icon.png", ui.Handler())
+	r.Handle("/apple-touch-icon.png", ui.Handler())
+	r.Handle("/apple-touch-icon-180x180.png", ui.Handler())
+	r.Handle("/android-chrome-192x192.png", ui.Handler())
+	r.Handle("/android-chrome-512x512.png", ui.Handler())
+	r.Handle("/tarak_logo_horizontal.png", ui.Handler())
+	r.Handle("/tarak_logo_vertical.png", ui.Handler())
 
 	// ── HTTP server ───────────────────────────────────────────────────────
 	s.httpSrv = &http.Server{
