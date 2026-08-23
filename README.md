@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/tarak_logo.jpg" alt="Tarak Logo" width="600" />
+  <img src="assets/tarak_github.jpg" alt="Tarak Logo" width="600" />
 </p>
 
 # Tarak
