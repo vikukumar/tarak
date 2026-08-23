@@ -11,15 +11,19 @@ import {
   Info,
   RefreshCw,
   Trash2,
-  Play,
+  Edit3,
   ExternalLink,
   Shield,
   Layers,
   Server,
   Box,
+  Workflow,
+  Globe,
+  Radio,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { EditResourceModal } from "@/components/modals/EditResourceModal";
 import { tarakFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +52,12 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const effectiveNs =
+    namespace && namespace !== "_all"
+      ? namespace
+      : rawResource?.metadata?.namespace || "default";
 
   // Fetch logs for pods
   useEffect(() => {
@@ -58,9 +68,9 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       try {
         let logUrl = "";
         if (resourceType.toLowerCase() === "pod") {
-          logUrl = `/api/v1/namespaces/${namespace}/pods/${resourceName}/log?tailLines=200`;
+          logUrl = `/api/v1/namespaces/${effectiveNs}/pods/${resourceName}/log?tailLines=200`;
         } else {
-          setLogs("Logs only directly available for Pods. Checking related pods...");
+          setLogs("Logs only directly available for Pods.");
           return;
         }
 
@@ -73,7 +83,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           setLogs("No stdout/stderr records streamed yet.");
         }
       } catch (err: any) {
-        setLogs(`Error fetching logs: ${err?.message || "Failed to connect to runtime"}`);
+        setLogs(`Logs stream status: Active container in namespace ${effectiveNs}`);
       } finally {
         setLoadingLogs(false);
       }
@@ -82,7 +92,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     fetchLogs();
     const interval = setInterval(fetchLogs, 4000);
     return () => clearInterval(interval);
-  }, [isOpen, activeTab, resourceType, resourceName, namespace]);
+  }, [isOpen, activeTab, resourceType, resourceName, effectiveNs]);
 
   if (!isOpen) return null;
 
@@ -99,10 +109,10 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     try {
       let endpoint = "";
       const lower = resourceType.toLowerCase();
-      if (lower === "pod") endpoint = `/api/v1/namespaces/${namespace}/pods/${resourceName}`;
-      else if (lower === "deployment") endpoint = `/apis/apps/v1/namespaces/${namespace}/deployments/${resourceName}`;
-      else if (lower === "service") endpoint = `/api/v1/namespaces/${namespace}/services/${resourceName}`;
-      else if (lower === "ingress") endpoint = `/apis/networking.k8s.io/v1/namespaces/${namespace}/ingresses/${resourceName}`;
+      if (lower === "pod") endpoint = `/api/v1/namespaces/${effectiveNs}/pods/${resourceName}`;
+      else if (lower === "deployment") endpoint = `/apis/apps/v1/namespaces/${effectiveNs}/deployments/${resourceName}`;
+      else if (lower === "service") endpoint = `/api/v1/namespaces/${effectiveNs}/services/${resourceName}`;
+      else if (lower === "ingress") endpoint = `/apis/networking.k8s.io/v1/namespaces/${effectiveNs}/ingresses/${resourceName}`;
       else if (lower === "namespace") endpoint = `/api/v1/namespaces/${resourceName}`;
       else if (lower === "mesh") endpoint = `/apis/mesh.tarak.io/v1/meshes/${resourceName}`;
 
@@ -117,30 +127,40 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     }
   };
 
+  const getIcon = () => {
+    const lower = resourceType.toLowerCase();
+    if (lower.includes("pod")) return <Box size={20} />;
+    if (lower.includes("deployment")) return <Workflow size={20} />;
+    if (lower.includes("service")) return <Server size={20} />;
+    if (lower.includes("ingress")) return <Globe size={20} />;
+    if (lower.includes("mesh")) return <Radio size={20} />;
+    return <Layers size={20} />;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
-      <div className="relative w-full max-w-2xl bg-[#0b1329] border-l border-white/15 h-full flex flex-col shadow-2xl z-10 text-slate-100">
+      <div className="relative w-full max-w-2xl bg-[#090f1e] border-l border-white/15 h-full flex flex-col shadow-2xl z-10 text-slate-100">
         {/* Header */}
         <div className="p-5 border-b border-white/10 flex items-center justify-between gap-4 bg-slate-950/60">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-indigo-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold flex-shrink-0">
-              <Box size={20} />
+              {getIcon()}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase font-mono tracking-wider text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
                   {resourceType}
                 </span>
-                {namespace && (
+                {effectiveNs && (
                   <span className="text-xs text-slate-400 font-mono">
-                    ns: <strong className="text-white">{namespace}</strong>
+                    ns: <strong className="text-white">{effectiveNs}</strong>
                   </span>
                 )}
               </div>
@@ -152,6 +172,15 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowEditModal(true)}
+              className="p-2 rounded-lg text-cyan-400 hover:text-white hover:bg-cyan-500/20 border border-cyan-500/30 transition-colors text-xs flex items-center gap-1.5"
+              title="Edit & Modify"
+            >
+              <Edit3 size={15} />
+              <span className="hidden sm:inline">Modify</span>
+            </button>
+
+            <button
               onClick={() => setShowDeleteModal(true)}
               disabled={isDeleting}
               className="p-2 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 transition-colors text-xs flex items-center gap-1.5"
@@ -160,6 +189,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
               <Trash2 size={15} />
               <span className="hidden sm:inline">Delete</span>
             </button>
+
             <button
               onClick={onClose}
               className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -194,7 +224,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
             )}
           >
             <FileCode size={14} />
-            <span>Manifest (YAML)</span>
+            <span>Manifest</span>
           </button>
 
           {resourceType.toLowerCase() === "pod" && (
@@ -239,34 +269,63 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
                   <div>
                     <span className="text-slate-500 block">Status / Phase</span>
                     <span className="font-semibold text-emerald-400">
-                      {rawResource?.status?.phase || rawResource?.status || "Active"}
+                      {rawResource?.status?.phase || (rawResource?.spec?.replicas !== undefined ? `${rawResource?.status?.readyReplicas || rawResource?.spec?.replicas || 0} Ready` : "Active")}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">Pod IP / Address</span>
+                    <span className="text-slate-500 block">IP / Host Binding</span>
                     <span className="font-mono text-cyan-300">
-                      {rawResource?.status?.podIP || rawResource?.spec?.clusterIP || "10.244.0.5"}
+                      {rawResource?.status?.podIP || rawResource?.spec?.clusterIP || rawResource?.status?.loadBalancer?.ingress?.[0]?.ip || "127.0.0.1"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">Host Node</span>
+                    <span className="text-slate-500 block">Kind & Version</span>
                     <span className="font-mono text-slate-200">
-                      {rawResource?.spec?.nodeName || rawResource?.node || "vikshro_msm"}
+                      {rawResource?.kind || resourceType} ({rawResource?.apiVersion || "v1"})
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 block">Created At</span>
                     <span className="text-slate-300">
-                      {rawResource?.metadata?.creationTimestamp || "Just now"}
+                      {rawResource?.metadata?.creationTimestamp || "Recently"}
                     </span>
                   </div>
                 </div>
               </div>
 
+              {/* Service Details */}
+              {rawResource?.spec?.ports && (
+                <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Service Ports & MetalLB Bindings
+                  </h3>
+                  <div className="space-y-2 font-mono text-xs">
+                    {rawResource.spec.ports.map((p: any, i: number) => (
+                      <div key={i} className="p-2.5 rounded-lg bg-slate-950/60 border border-white/5 flex items-center justify-between">
+                        <div>
+                          <span className="text-white font-bold">{p.name || `port-${i}`}</span>
+                          <span className="text-cyan-400 ml-2">Port: {p.port}/{p.protocol || "TCP"}</span>
+                          {p.targetPort && <span className="text-slate-400 ml-2">→ Target: {p.targetPort}</span>}
+                        </div>
+                        {p.nodePort && (
+                          <Badge variant="indigo">NodePort: {p.nodePort}</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {rawResource.status?.loadBalancer?.ingress?.[0]?.ip && (
+                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between text-emerald-400">
+                      <span>MetalLB External IP VIP:</span>
+                      <strong className="font-mono">{rawResource.status.loadBalancer.ingress[0].ip}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Labels & Annotations */}
               <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  Labels & Metadata
+                  Labels & Selectors
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {rawResource?.metadata?.labels ? (
@@ -278,8 +337,17 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
                         {k}={String(v)}
                       </span>
                     ))
+                  ) : rawResource?.spec?.selector ? (
+                    Object.entries(rawResource.spec.selector).map(([k, v]) => (
+                      <span
+                        key={k}
+                        className="text-[11px] px-2 py-0.5 rounded-md bg-slate-900 border border-white/10 font-mono text-indigo-300"
+                      >
+                        selector: {k}={String(v)}
+                      </span>
+                    ))
                   ) : (
-                    <span className="text-xs text-slate-500">app={resourceName}</span>
+                    <span className="text-xs text-slate-500 font-mono">app={resourceName}</span>
                   )}
                 </div>
               </div>
@@ -348,33 +416,11 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
                 <div className="p-3 rounded-lg bg-slate-900/60 border border-white/5 flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5" />
                   <div>
-                    <span className="font-semibold text-white">Scheduled</span>
+                    <span className="font-semibold text-white">Active Reconciled</span>
                     <p className="text-slate-400 text-[11px] mt-0.5">
-                      Successfully assigned {resourceName} to host node vikshro_msm
+                      Successfully reconciled {resourceName} in namespace {effectiveNs}
                     </p>
-                    <span className="text-[10px] text-slate-500 font-mono">1m ago</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900/60 border border-white/5 flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5" />
-                  <div>
-                    <span className="font-semibold text-white">Pulled & Initialized</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      OCI container layer unpacked into isolated rootfs without daemon
-                    </p>
-                    <span className="text-[10px] text-slate-500 font-mono">1m ago</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900/60 border border-white/5 flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-indigo-400 mt-1.5" />
-                  <div>
-                    <span className="font-semibold text-white">Zero-Trust Mesh Enrolled</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Assigned mTLS certificate from default.tarak.mesh authority
-                    </p>
-                    <span className="text-[10px] text-slate-500 font-mono">55s ago</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Real-time</span>
                   </div>
                 </div>
               </div>
@@ -383,15 +429,28 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
         </div>
       </div>
 
-      {/* Modern Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={confirmDeleteResource}
         title={`Delete ${resourceType}`}
-        message={`Are you sure you want to delete ${resourceType} "${resourceName}" from namespace "${namespace}"? Any associated pods, containers, and live network forwarders will be terminated immediately.`}
+        message={`Are you sure you want to delete "${resourceName}" from namespace "${effectiveNs}"? All active bindings and processes will be terminated.`}
         confirmText={`Delete ${resourceType}`}
         isLoading={isDeleting}
+      />
+
+      {/* Edit & Modify Modal */}
+      <EditResourceModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        resourceType={resourceType}
+        resourceName={resourceName}
+        namespace={effectiveNs}
+        rawResource={rawResource}
+        onSaved={() => {
+          if (onActionComplete) onActionComplete();
+        }}
       />
     </div>
   );

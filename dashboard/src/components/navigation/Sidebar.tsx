@@ -52,15 +52,17 @@ export const navigationConfig: NavItem[] = [
       { title: "Pods", href: "/dashboard/workloads/pods", icon: Box },
       { title: "Deployments", href: "/dashboard/workloads/deployments", icon: Workflow },
       { title: "StatefulSets", href: "/dashboard/workloads/statefulsets", icon: Database },
+      { title: "DaemonSets", href: "/dashboard/workloads/daemonsets", icon: Layers, badge: "Daemon" },
       { title: "Jobs & CronJobs", href: "/dashboard/workloads/jobs", icon: Zap },
     ],
   },
   {
-    title: "Cluster & Nodes",
+    title: "Cluster & Config",
     icon: Server,
     children: [
-      { title: "Nodes", href: "/dashboard/cluster/nodes", icon: Cpu },
+      { title: "Nodes & Hardware", href: "/dashboard/cluster/nodes", icon: Cpu },
       { title: "Namespaces", href: "/dashboard/cluster/namespaces", icon: Globe },
+      { title: "ConfigMaps & Secrets", href: "/dashboard/cluster/configmaps", icon: Database },
       { title: "Storage (PVC / SC)", href: "/dashboard/cluster/storage", icon: Database },
     ],
   },
@@ -70,6 +72,7 @@ export const navigationConfig: NavItem[] = [
     children: [
       { title: "Ingress & Domains", href: "/dashboard/networking/ingress", icon: Globe },
       { title: "Services & MetalLB", href: "/dashboard/networking/services", icon: Server },
+      { title: "Network Policies", href: "/dashboard/networking/policies", icon: Shield },
       { title: "Cloudflare & Tailscale", href: "/dashboard/networking/tunnels", icon: Cloud, badge: "Tunnel" },
     ],
   },
@@ -91,6 +94,7 @@ export const navigationConfig: NavItem[] = [
       { title: "Hubble Network Flows", href: "/dashboard/observability/hubble", icon: Activity, badge: "Live" },
       { title: "Cluster Metrics", href: "/dashboard/observability/metrics", icon: Cpu },
       { title: "Container Logs", href: "/dashboard/observability/logs", icon: Terminal },
+      { title: "Diagnostic Events", href: "/dashboard/observability/events", icon: Activity },
     ],
   },
   {
@@ -100,6 +104,7 @@ export const navigationConfig: NavItem[] = [
       { title: "RBAC Matrix", href: "/dashboard/security/rbac", icon: Lock },
       { title: "Tarak Security Policies", href: "/dashboard/security/zerotrust", icon: Shield },
       { title: "SSO & Identity", href: "/dashboard/security/sso", icon: Key },
+      { title: "Service Accounts & PKI", href: "/dashboard/security/certificates", icon: Key },
     ],
   },
   {
@@ -108,6 +113,7 @@ export const navigationConfig: NavItem[] = [
     children: [
       { title: "Web Terminal", href: "/dashboard/devtools/terminal", icon: Terminal },
       { title: "YAML Manifest Apply", href: "/dashboard/devtools/manifests", icon: FileCode },
+      { title: "Runtime & CRI Engine", href: "/dashboard/devtools/runtime", icon: Cpu, badge: "CRI" },
     ],
   },
   {

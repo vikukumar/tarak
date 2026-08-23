@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Server, RefreshCw, Plus, FileCode, Trash2 } from "lucide-react";
+import { Server, RefreshCw, Plus, FileCode, Trash2, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { EditResourceModal } from "@/components/modals/EditResourceModal";
 import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
@@ -17,6 +18,7 @@ export default function ServicesPage() {
   const [services, setServices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<any | null>(null);
+  const [svcToEdit, setSvcToEdit] = useState<any | null>(null);
   const [svcToDelete, setSvcToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -42,7 +44,9 @@ export default function ServicesPage() {
     if (!svcToDelete) return;
     setIsDeleting(true);
     try {
-      const ns = svcToDelete.metadata?.namespace || selectedNamespace;
+      const ns =
+        svcToDelete.metadata?.namespace ||
+        (selectedNamespace === "_all" ? "default" : selectedNamespace);
       const name = svcToDelete.metadata?.name;
       await tarakFetch(`/api/v1/namespaces/${ns}/services/${name}`, {
         method: "DELETE",
@@ -144,6 +148,13 @@ export default function ServicesPage() {
             <FileCode size={14} />
           </button>
           <button
+            onClick={() => setSvcToEdit(svc)}
+            className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-cyan-500/20 text-cyan-400 border border-white/10 transition-colors"
+            title="Modify Service"
+          >
+            <Edit3 size={14} />
+          </button>
+          <button
             onClick={() => setSvcToDelete(svc)}
             className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Service"
@@ -209,6 +220,17 @@ export default function ServicesPage() {
         namespace={selectedService?.metadata?.namespace || selectedNamespace}
         rawResource={selectedService}
         onActionComplete={fetchServices}
+      />
+
+      {/* Edit & Modify Modal */}
+      <EditResourceModal
+        isOpen={!!svcToEdit}
+        onClose={() => setSvcToEdit(null)}
+        resourceType="Service"
+        resourceName={svcToEdit?.metadata?.name || ""}
+        namespace={svcToEdit?.metadata?.namespace || selectedNamespace}
+        rawResource={svcToEdit}
+        onSaved={fetchServices}
       />
 
       {/* Delete Confirmation Modal */}
