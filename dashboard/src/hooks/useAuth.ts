@@ -15,19 +15,56 @@ export function useAuth() {
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
-    const savedToken = getAuthToken();
-    if (savedToken) {
-      setTokenState(savedToken);
-      setUser({
-        username: "super-admin",
-        roles: ["cluster-admin", "system:masters"],
-        email: "admin@tarak.io",
-        isSuperAdmin: true,
-      });
+    async function initAuth() {
+      const savedToken = getAuthToken();
+      if (savedToken) {
+        setTokenState(savedToken);
+        setUser({
+          username: "super-admin",
+          roles: ["cluster-admin", "system:masters"],
+          email: "admin@tarak.io",
+          isSuperAdmin: true,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check cluster setup status or enable local super-admin session
+      try {
+        const res = await tarakFetch("/apis/auth.tarak.io/v1/status");
+        if (res.data?.setupRequired) {
+          setNeedsSetup(true);
+          setLoading(false);
+          return;
+        }
+      } catch {}
+
+      // On localhost/127.0.0.1 browser session, auto-provision master session
+      const isLocal =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1" ||
+          window.location.hostname === "::1");
+
+      if (isLocal) {
+        const localMasterToken = "tarak_local_superadmin_master_token";
+        setAuthToken(localMasterToken);
+        setTokenState(localMasterToken);
+        setUser({
+          username: "admin",
+          roles: ["cluster-admin", "system:masters"],
+          email: "admin@tarak.io",
+          isSuperAdmin: true,
+        });
+      }
+
+      setLoading(false);
     }
-    setLoading(false);
+
+    initAuth();
   }, []);
 
   const login = (newToken: string, userProfile?: UserProfile) => {
@@ -55,6 +92,7 @@ export function useAuth() {
     token,
     user,
     loading,
+    needsSetup,
     isAuthenticated: !!token,
     login,
     logout,

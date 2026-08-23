@@ -1,20 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Sidebar } from "@/components/navigation/Sidebar";
 import { Topbar } from "@/components/navigation/Topbar";
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import { useTarakWebSocket } from "@/hooks/useTarakWebSocket";
+import { Shield, ArrowRight } from "lucide-react";
 
 export default function DashboardShellLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, needsSetup } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [liveToast, setLiveToast] = useState<string | null>(null);
 
@@ -26,17 +26,52 @@ export default function DashboardShellLayout({
   });
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.replace("/login");
+    if (!loading) {
+      if (needsSetup) {
+        window.location.href = "/dashboard/setup/";
+      }
     }
-  }, [isAuthenticated, loading, router]);
+  }, [loading, needsSetup]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#070c18]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 animate-pulse" />
-          <span className="text-xs text-slate-400">Authenticating with Tarak Control Plane...</span>
+          <span className="text-xs text-slate-400">Loading Tarak Control Plane...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#070c18] p-4">
+        <div className="max-w-md w-full glass-panel rounded-2xl p-8 border border-white/10 text-center space-y-6 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 mx-auto flex items-center justify-center font-bold text-slate-950 text-2xl shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+            T
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold text-white tracking-tight">Authentication Required</h2>
+            <p className="text-xs text-slate-400">
+              Your session has expired or master credentials are required to manage cluster workloads.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <a
+              href="/dashboard/login/"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-bold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
+            >
+              <span>Sign In to Cluster</span>
+              <ArrowRight size={14} />
+            </a>
+            <a
+              href="/dashboard/setup/"
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-white/10 text-slate-300 font-semibold text-xs border border-white/10 transition-colors"
+            >
+              1st Time Super-Admin Setup
+            </a>
+          </div>
         </div>
       </div>
     );

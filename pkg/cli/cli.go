@@ -220,6 +220,11 @@ func newGetCmd() *cobra.Command {
 
 				body, err := client.get(url)
 				if err != nil {
+					// If it is a connection failure (server down or unreachable), fail immediately
+					errStr := err.Error()
+					if strings.Contains(errStr, "request failed") || strings.Contains(errStr, "refused") || strings.Contains(errStr, "connectex") || strings.Contains(errStr, "dial tcp") {
+						return err
+					}
 					if specificName != "" || !isMultiple {
 						return err
 					}
@@ -2743,6 +2748,12 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 		}
 		for _, raw := range items {
 			var m struct {
+				Name        string    `json:"name"`
+				CreatedAt   time.Time `json:"createdAt"`
+				Passthrough string    `json:"passthrough"`
+				MTLS        struct {
+					Mode string `json:"mode"`
+				} `json:"mtls"`
 				Metadata struct {
 					Name              string    `json:"name"`
 					CreationTimestamp time.Time `json:"creationTimestamp"`
@@ -2762,21 +2773,47 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 				} `json:"status"`
 			}
 			_ = json.Unmarshal(raw, &m)
-			mtlsMode := m.Spec.MTLS.Mode
+
+			name := m.Name
+			if name == "" {
+				name = m.Metadata.Name
+			}
+			if name == "" {
+				name = "default"
+			}
+
+			mtlsMode := m.MTLS.Mode
+			if mtlsMode == "" {
+				mtlsMode = m.Spec.MTLS.Mode
+			}
 			if mtlsMode == "" {
 				mtlsMode = "Strict"
 			}
-			passMode := m.Spec.Networking.PassthroughMode
+
+			passMode := m.Passthrough
+			if passMode == "" {
+				passMode = m.Spec.Networking.PassthroughMode
+			}
 			if passMode == "" {
 				passMode = "Passthrough"
 			}
+
 			phase := m.Status.Phase
 			if phase == "" {
 				phase = "Active"
 			}
-			age := formatAge(time.Since(m.Metadata.CreationTimestamp))
+
+			created := m.CreatedAt
+			if created.IsZero() {
+				created = m.Metadata.CreationTimestamp
+			}
+			ageStr := "0s"
+			if !created.IsZero() {
+				ageStr = formatAge(time.Since(created))
+			}
+
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
-				m.Metadata.Name, phase, mtlsMode, passMode, m.Status.TotalServices, m.Status.EnrolledPods, age)
+				name, phase, mtlsMode, passMode, m.Status.TotalServices, m.Status.EnrolledPods, ageStr)
 		}
 
 	default:
