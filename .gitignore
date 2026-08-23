@@ -50,3 +50,6 @@ out
 out/
 assets/*.js
 assets/*.css
+internal/ui/dist/*
+!internal/ui/dist
+!internal/ui/dist/.gitkeep

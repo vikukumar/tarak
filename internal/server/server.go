@@ -878,6 +878,11 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 
 	netInfo := s.networkDriver.GetHostNetworkInfo()
 
+	rtVer := "tarak-runtime://v" + version.Version
+	if s.runtime != nil {
+		rtVer = s.runtime.GetRuntimeVersion().RuntimeName
+	}
+
 	nodeObj := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Node",
@@ -928,7 +933,7 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 				"kubeletVersion":          "v" + version.Version + "-tarak",
 				"osImage":                 fmt.Sprintf("Tarak Native (%s/%s)", runtime.GOOS, runtime.GOARCH),
 				"kernelVersion":           runtime.Version(),
-				"containerRuntimeVersion": "tarak-runtime://v" + version.Version,
+				"containerRuntimeVersion": rtVer,
 				"architecture":            runtime.GOARCH,
 				"operatingSystem":         runtime.GOOS,
 			},

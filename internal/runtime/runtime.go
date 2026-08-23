@@ -184,47 +184,27 @@ func NewEngine(dataDir string, log *zap.Logger) *Engine {
 	return e
 }
 
-// detectContainerRuntime tries Docker → Podman → nerdctl in priority order.
-// All three share identical CLI syntax, so whichever is found first is used transparently.
+// detectContainerRuntime scans Docker, Podman, nerdctl, Windows Containers, or TCR in priority order.
 func (e *Engine) detectContainerRuntime() {
-	candidates := []string{"docker", "podman", "nerdctl"}
-
-	for _, name := range candidates {
-		binPath, err := exec.LookPath(name)
-		if err != nil {
-			continue
-		}
-
-		// Confirm daemon is actually reachable — binary presence alone is not enough
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-		var cmd *exec.Cmd
-		if name == "nerdctl" {
-			cmd = exec.CommandContext(ctx, binPath, "info")
-		} else {
-			cmd = exec.CommandContext(ctx, binPath, "info", "--format", "{{.ServerVersion}}")
-		}
-		out, err := cmd.Output()
-		cancel()
-
-		if err == nil && len(bytes.TrimSpace(out)) > 0 {
-			e.runtimePath = binPath
-			e.runtimeName = name
-			e.hasRuntime = true
-			e.log.Info("tarak container runtime detected",
-				zap.String("runtime", name),
-				zap.String("bin", binPath),
-				zap.String("version", strings.TrimSpace(string(out))),
-			)
-			return
-		}
-
-		e.log.Debug("container runtime candidate not available", zap.String("candidate", name))
+	rep := ProbeHostRuntimes(e.log)
+	if rep.Type != RuntimeTypeTCRNative && rep.IsAvailable {
+		e.runtimePath = rep.BinaryPath
+		e.runtimeName = string(rep.Type)
+		e.hasRuntime = true
+		e.log.Info("tarak active container runtime configured",
+			zap.String("runtime", rep.Name),
+			zap.String("version", rep.Version),
+			zap.String("bin", rep.BinaryPath),
+		)
+	} else {
+		e.hasRuntime = false
+		e.runtimeName = "tcr"
+		e.log.Info("tarak native container runtime (TCR) activated",
+			zap.String("description", rep.Description),
+			zap.String("os", runtime.GOOS),
+			zap.String("arch", runtime.GOARCH),
+		)
 	}
-
-	e.hasRuntime = false
-	e.log.Warn("no container runtime detected — install Docker Desktop, Podman Desktop, or Rancher Desktop (nerdctl)",
-		zap.String("os", runtime.GOOS),
-	)
 }
 
 // IsDockerAvailable returns true if any OCI container runtime is available.
@@ -1108,8 +1088,11 @@ func (e *Engine) GetNodeMetrics(ctx context.Context, nodeName string) (*Containe
 
 // GetRuntimeVersion returns runtime version metadata including which runtime is active.
 func (e *Engine) GetRuntimeVersion() RuntimeVersionInfo {
-	mode := "No container runtime detected (install Docker Desktop, Podman Desktop, or Rancher Desktop)"
-	runtimeDisplay := "none"
+	mode := "Tarak Native Container Engine (TCR: Isolated Rootfs & Process Sandbox)"
+	runtimeDisplay := "tcr-native"
+	if runtime.GOOS == "linux" {
+		mode = "Tarak Native Container Engine (Linux Kernel Namespaces & cgroups)"
+	}
 	if e.hasRuntime {
 		mode = fmt.Sprintf("OCI Runtime: %s", e.runtimeName)
 		runtimeDisplay = e.runtimeName
@@ -1118,7 +1101,7 @@ func (e *Engine) GetRuntimeVersion() RuntimeVersionInfo {
 		Version:        version.Version,
 		CRIVersion:     "v1",
 		OCIVersion:     "v1.1.0",
-		RuntimeName:    fmt.Sprintf("tarak-runtime (%s)", runtimeDisplay),
+		RuntimeName:    fmt.Sprintf("tarak-runtime://%s", runtimeDisplay),
 		RuntimeVersion: version.Version,
 		EngineMode:     mode,
 		OS:             runtime.GOOS,

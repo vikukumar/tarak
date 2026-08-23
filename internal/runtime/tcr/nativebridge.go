@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -183,10 +184,42 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		if len(ports) > 0 && ports[0] > 0 {
 			port = ports[0]
 		}
-		logStartup(fmt.Sprintf("detected web server image (%s), starting built-in Go HTTP server on :%d",
+		logStartup(fmt.Sprintf("detected web server image (%s), starting native web server on :%d",
 			imageTypeName(imgType), port))
 		logStartup(fmt.Sprintf("serving web root: %s", webRoot))
 		return startBuiltinHTTPServer(ctx, cfg.ID, webRoot, port, logFile)
+
+	case ImageTypeNodeJS:
+		if nodeBin, err := exec.LookPath("node"); err == nil {
+			logStartup(fmt.Sprintf("running Node.js container with host node binary (%s)", nodeBin))
+			nodeArgs := cfg.Command
+			if len(nodeArgs) > 0 && (nodeArgs[0] == "node" || strings.HasSuffix(nodeArgs[0], "/node")) {
+				nodeArgs = nodeArgs[1:]
+			}
+			return startNativeProcess(ctx, cfg.ID, nodeBin, nodeArgs, cfg.Env, cfg.WorkingDir, logFile)
+		}
+		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
+			return proc, nil
+		}
+
+	case ImageTypePython:
+		pyBin := ""
+		if p, err := exec.LookPath("python3"); err == nil {
+			pyBin = p
+		} else if p, err := exec.LookPath("python"); err == nil {
+			pyBin = p
+		}
+		if pyBin != "" {
+			logStartup(fmt.Sprintf("running Python container with host python binary (%s)", pyBin))
+			pyArgs := cfg.Command
+			if len(pyArgs) > 0 && (strings.HasPrefix(pyArgs[0], "python") || strings.Contains(pyArgs[0], "/python")) {
+				pyArgs = pyArgs[1:]
+			}
+			return startNativeProcess(ctx, cfg.ID, pyBin, pyArgs, cfg.Env, cfg.WorkingDir, logFile)
+		}
+		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
+			return proc, nil
+		}
 
 	case ImageTypeWASM:
 		wasmPath := findWASMFile(cfg.Rootfs)
@@ -197,30 +230,34 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		return startWASMProcess(ctx, cfg, wasmPath, logFile)
 
 	default:
-		// Try to find and run a platform-native binary in the rootfs
 		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
 			return proc, nil
 		}
-
-		// Nothing worked — give a clear, helpful error
-		return nil, fmt.Errorf(
-			"TCR Bridge (%s/%s): cannot run this container image natively.\n\n"+
-				"Image type: %s\n"+
-				"Rootfs: %s\n\n"+
-				"What you can do:\n"+
-				"  1. Use a multi-arch image that includes %s/%s binaries\n"+
-				"  2. Use a web server image (nginx, caddy, apache) — TCR will serve it natively\n"+
-				"  3. Use a WASM/WASI image — TCR runs these on all platforms\n"+
-				"  4. On Windows: install Docker Desktop (uses WSL2) — Tarak auto-detects it\n"+
-				"  5. Run tarak on Linux — full native container support via kernel namespaces\n\n"+
-				"TCR note: %s",
-			runtime.GOOS, runtime.GOARCH,
-			imageTypeName(imgType),
-			cfg.Rootfs,
-			runtime.GOOS, runtime.GOARCH,
-			platformNote(),
-		)
 	}
+
+	// Try to find and run a platform-native binary in the rootfs or on PATH
+	if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
+		return proc, nil
+	}
+
+	// Nothing worked — give a clear, helpful error
+	return nil, fmt.Errorf(
+		"TCR Bridge (%s/%s): cannot run this container image natively.\n\n"+
+			"Image type: %s\n"+
+			"Rootfs: %s\n\n"+
+			"What you can do:\n"+
+			"  1. Use a multi-arch image that includes %s/%s binaries\n"+
+			"  2. Use a web server image (nginx, caddy, apache) — TCR will serve it natively\n"+
+			"  3. Use a WASM/WASI image — TCR runs these on all platforms\n"+
+			"  4. On Windows: install Docker Desktop (uses WSL2) — Tarak auto-detects it\n"+
+			"  5. Run tarak on Linux — full native container support via kernel namespaces\n\n"+
+			"TCR note: %s",
+		runtime.GOOS, runtime.GOARCH,
+		imageTypeName(imgType),
+		cfg.Rootfs,
+		runtime.GOOS, runtime.GOARCH,
+		platformNote(),
+	)
 }
 
 // startBuiltinHTTPServer launches an embedded Go HTTP server serving static files.
@@ -372,6 +409,11 @@ func tryRunNativeBinary(ctx context.Context, cfg ContainerConfig, logFile *os.Fi
 				return startNativeProcess(ctx, cfg.ID, candidate, cfg.Command[1:], cfg.Env, cfg.WorkingDir, logFile)
 			}
 		}
+	}
+
+	// Check if entrypoint executable is available on host PATH
+	if hostBin, err := exec.LookPath(entryName); err == nil {
+		return startNativeProcess(ctx, cfg.ID, hostBin, cfg.Command[1:], cfg.Env, cfg.WorkingDir, logFile)
 	}
 
 	return nil, fmt.Errorf("no native binary found")

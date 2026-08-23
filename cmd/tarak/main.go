@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
+	"github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/runtime/tcr"
 	"github.com/vikukumar/tarak/internal/server"
 	"github.com/vikukumar/tarak/internal/version"
@@ -117,14 +118,14 @@ func runInit(opts initOptions) error {
 	}
 
 	// 1. Generate Root CA
-	fmt.Printf("[1/4] Generating Root Certificate Authority (P-256 ECDSA)...\n")
+	fmt.Printf("[1/5] Generating Root Certificate Authority (P-256 ECDSA)...\n")
 	ca, err := security.GenerateCA()
 	if err != nil {
 		return fmt.Errorf("generate CA: %w", err)
 	}
 
 	// 2. Sign Server Cert
-	fmt.Printf("[2/4] Signing API Server certificate with SANs: %v...\n", opts.sans)
+	fmt.Printf("[2/5] Signing API Server certificate with SANs: %v...\n", opts.sans)
 	serverCert, err := ca.SignServerCert(security.ServerCertOptions{
 		CommonName: "tarak-apiserver",
 		SANs:       opts.sans,
@@ -135,7 +136,7 @@ func runInit(opts initOptions) error {
 	}
 
 	// 3. Sign Admin Client Cert
-	fmt.Printf("[3/4] Signing Cluster Admin client certificate (O=system:masters)...\n")
+	fmt.Printf("[3/5] Signing Cluster Admin client certificate (O=system:masters)...\n")
 	adminCert, err := ca.SignClientCert(security.ClientCertOptions{
 		CommonName:    "tarak-admin",
 		Organizations: []string{"system:masters"},
@@ -152,10 +153,16 @@ func runInit(opts initOptions) error {
 	fmt.Printf("      -> Saved PKI files to: %s\n", pkiDir)
 
 	// 4. Generate Kubeconfig
-	fmt.Printf("[4/4] Generating Administrator Kubeconfig at: %s...\n", opts.kubeconfig)
+	fmt.Printf("[4/5] Generating Administrator Kubeconfig at: %s...\n", opts.kubeconfig)
 	if err := writeKubeconfig(opts.kubeconfig, opts.bindAddress, ca.CertPEM, adminCert.CertPEM, adminCert.KeyPEM); err != nil {
 		return fmt.Errorf("write kubeconfig: %w", err)
 	}
+
+	// 5. Detect & Display Container Runtime Environment
+	fmt.Printf("[5/5] Detecting Container Runtime Environment...\n")
+	rtReport := runtime.ProbeHostRuntimes(nil)
+	fmt.Printf("      -> Active Engine: %s (%s)\n", rtReport.Name, rtReport.Version)
+	fmt.Printf("      -> Mode: %s\n", rtReport.Description)
 
 	fmt.Println()
 	fmt.Println("Initialization complete!")
