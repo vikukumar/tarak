@@ -49,11 +49,11 @@ type DeliveryRecord struct {
 
 // Manager handles webhook registrations, event subscriptions, and async deliveries.
 type Manager struct {
-	log         *zap.Logger
-	mu          sync.RWMutex
-	webhooks    map[string]*WebhookEndpoint
-	deliveries  []DeliveryRecord
-	client      *http.Client
+	log        *zap.Logger
+	mu         sync.RWMutex
+	webhooks   map[string]*WebhookEndpoint
+	deliveries []DeliveryRecord
+	client     *http.Client
 }
 
 // NewManager initializes the Webhook subsystem with default event handlers.

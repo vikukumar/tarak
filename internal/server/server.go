@@ -128,6 +128,21 @@ type Config struct {
 	// GPULimit optionally overrides host GPU allocation (defaults to all attached host GPUs).
 	GPULimit string
 
+	// PodCIDR is the user-configured cluster CIDR for Pod IPs (e.g. "10.244.0.0/16").
+	PodCIDR string
+
+	// ServiceCIDR is the user-configured cluster CIDR for ClusterIPs (e.g. "10.96.0.0/12").
+	ServiceCIDR string
+
+	// DNSServerIP is the IP of the CoreDNS resolver (e.g. "10.96.0.10").
+	DNSServerIP string
+
+	// BridgeName is the custom Linux bridge device name (e.g. "tarak-br0").
+	BridgeName string
+
+	// CNIEnablePolicy enables strict NetworkPolicy enforcement in the CNI driver.
+	CNIEnablePolicy bool
+
 	// Log is the structured logger.  A production logger is created if nil.
 	Log *zap.Logger
 
@@ -216,17 +231,17 @@ func New(cfg Config) (*Server, error) {
 	hostInfo := hardware.DetectHost()
 	alloc := hardware.ComputeAllocation(hostInfo, cfg.CPULimit, cfg.MemoryLimit, cfg.GPULimit)
 	netDriver := network.NewDriver(network.BridgeConfig{
-		PodCIDR:     "10.244.0.0/16",
-		ServiceCIDR: "10.96.0.0/12",
+		PodCIDR:     cfg.PodCIDR,
+		ServiceCIDR: cfg.ServiceCIDR,
 		EnablemTLS:  true,
 	}, cfg.Log)
 
 	inbuiltCNI := network.NewInbuiltCNI(network.CNIConfig{
-		PodCIDR:      "10.244.0.0/16",
-		ServiceCIDR:  "10.96.0.0/12",
-		DNSServerIP:  "10.96.0.10",
-		BridgeName:   "tarak-br0",
-		EnablePolicy: true,
+		PodCIDR:      cfg.PodCIDR,
+		ServiceCIDR:  cfg.ServiceCIDR,
+		DNSServerIP:  cfg.DNSServerIP,
+		BridgeName:   cfg.BridgeName,
+		EnablePolicy: cfg.CNIEnablePolicy,
 	}, cfg.Log)
 
 	// Add state store health check.
@@ -1172,6 +1187,18 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.StateStorePath == "" {
 		cfg.StateStorePath = cfg.DataDir + "/state.db"
+	}
+	if cfg.PodCIDR == "" {
+		cfg.PodCIDR = "10.244.0.0/16"
+	}
+	if cfg.ServiceCIDR == "" {
+		cfg.ServiceCIDR = "10.96.0.0/12"
+	}
+	if cfg.DNSServerIP == "" {
+		cfg.DNSServerIP = "10.96.0.10"
+	}
+	if cfg.BridgeName == "" {
+		cfg.BridgeName = "tarak-br0"
 	}
 	if cfg.ShutdownTimeout == 0 {
 		cfg.ShutdownTimeout = 30 * time.Second

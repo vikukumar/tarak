@@ -63,7 +63,7 @@ type Engine struct {
 	apps map[string]*Application
 }
 
-// NewEngine creates and initializes the GitOps CD engine with starter applications.
+// NewEngine creates and initializes the GitOps CD engine.
 func NewEngine(log *zap.Logger) *Engine {
 	if log == nil {
 		log = zap.NewNop()
@@ -73,52 +73,26 @@ func NewEngine(log *zap.Logger) *Engine {
 		log:  log.Named("gitops-cd"),
 		apps: make(map[string]*Application),
 	}
-
-	eng.seedDefaultApps()
 	return eng
 }
 
-func (eng *Engine) seedDefaultApps() {
-	now := time.Now()
-
-	eng.apps["ecommerce-storefront"] = &Application{
-		Name:           "ecommerce-storefront",
-		Namespace:      "tarak-cd",
-		RepoURL:        "https://github.com/vikukumar/tarak-examples",
-		TargetRevision: "main",
-		Path:           "manifests/apps/storefront",
-		DestServer:     "https://127.0.0.1:6443",
-		DestNamespace:  "production",
-		SyncStatus:     SyncStatusSynced,
-		HealthStatus:   HealthStatusHealthy,
-		AutoSync:       true,
-		LastSyncedAt:   now.Add(-4 * time.Minute),
-		Resources: []ResourceRef{
-			{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "production", Name: "storefront-web", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-			{Group: "", Version: "v1", Kind: "Service", Namespace: "production", Name: "storefront-svc", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-			{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress", Namespace: "production", Name: "storefront-ing", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-			{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "production", Name: "storefront-env", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-		},
+// RegisterApplication adds or updates a GitOps Application definition.
+func (eng *Engine) RegisterApplication(app *Application) {
+	if app == nil || app.Name == "" {
+		return
 	}
+	eng.mu.Lock()
+	defer eng.mu.Unlock()
+	eng.apps[app.Name] = app
+	eng.log.Info("registered gitops application", zap.String("name", app.Name), zap.String("repo", app.RepoURL))
+}
 
-	eng.apps["payments-gateway"] = &Application{
-		Name:           "payments-gateway",
-		Namespace:      "tarak-cd",
-		RepoURL:        "https://github.com/vikukumar/tarak-examples",
-		TargetRevision: "v2.1.0",
-		Path:           "manifests/services/payments",
-		DestServer:     "https://127.0.0.1:6443",
-		DestNamespace:  "finance",
-		SyncStatus:     SyncStatusSynced,
-		HealthStatus:   HealthStatusHealthy,
-		AutoSync:       false,
-		LastSyncedAt:   now.Add(-18 * time.Minute),
-		Resources: []ResourceRef{
-			{Group: "apps", Version: "v1", Kind: "StatefulSet", Namespace: "finance", Name: "payments-db", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-			{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "finance", Name: "payments-api", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-			{Group: "", Version: "v1", Kind: "Service", Namespace: "finance", Name: "payments-clusterip", Status: SyncStatusSynced, Health: HealthStatusHealthy},
-		},
-	}
+// DeleteApplication removes a GitOps Application by name.
+func (eng *Engine) DeleteApplication(name string) {
+	eng.mu.Lock()
+	defer eng.mu.Unlock()
+	delete(eng.apps, name)
+	eng.log.Info("deleted gitops application", zap.String("name", name))
 }
 
 // ListApplications returns all active GitOps applications.

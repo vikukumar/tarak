@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   GitBranch,
   RefreshCw,
@@ -49,101 +49,42 @@ interface GitOpsApp {
   resources: AppResource[];
 }
 
-const initialApps: GitOpsApp[] = [
-  {
-    name: "ecommerce-storefront",
-    namespace: "tarak-cd",
-    repoURL: "https://github.com/vikukumar/tarak-examples",
-    targetRevision: "main",
-    path: "manifests/apps/storefront",
-    destServer: "in-cluster (https://127.0.0.1:6443)",
-    destNamespace: "production",
-    syncStatus: "Synced",
-    healthStatus: "Healthy",
-    autoSync: true,
-    lastSynced: "4 mins ago",
-    resources: [
-      { kind: "Deployment", name: "storefront-web", namespace: "production", status: "Synced", health: "Healthy" },
-      { kind: "Service", name: "storefront-svc", namespace: "production", status: "Synced", health: "Healthy" },
-      { kind: "Ingress", name: "storefront-ing", namespace: "production", status: "Synced", health: "Healthy" },
-      { kind: "ConfigMap", name: "storefront-env", namespace: "production", status: "Synced", health: "Healthy" },
-    ],
-  },
-  {
-    name: "payments-gateway",
-    namespace: "tarak-cd",
-    repoURL: "https://github.com/vikukumar/tarak-examples",
-    targetRevision: "v2.1.0",
-    path: "manifests/services/payments",
-    destServer: "in-cluster (https://127.0.0.1:6443)",
-    destNamespace: "finance",
-    syncStatus: "Synced",
-    healthStatus: "Healthy",
-    autoSync: false,
-    lastSynced: "18 mins ago",
-    resources: [
-      { kind: "StatefulSet", name: "payments-db", namespace: "finance", status: "Synced", health: "Healthy" },
-      { kind: "Deployment", name: "payments-api", namespace: "finance", status: "Synced", health: "Healthy" },
-      { kind: "Service", name: "payments-clusterip", namespace: "finance", status: "Synced", health: "Healthy" },
-    ],
-  },
-  {
-    name: "ai-inference-engine",
-    namespace: "tarak-cd",
-    repoURL: "https://github.com/vikukumar/tarak-examples",
-    targetRevision: "feat/tensorrt-v3",
-    path: "manifests/ai/inference",
-    destServer: "in-cluster (https://127.0.0.1:6443)",
-    destNamespace: "ai-workloads",
-    syncStatus: "OutOfSync",
-    healthStatus: "Progressing",
-    autoSync: true,
-    lastSynced: "1 hour ago",
-    resources: [
-      { kind: "Deployment", name: "tensor-runtime", namespace: "ai-workloads", status: "OutOfSync", health: "Progressing" },
-      { kind: "Service", name: "tensor-grpc", namespace: "ai-workloads", status: "Synced", health: "Healthy" },
-    ],
-  },
-];
+import { tarakFetch } from "@/lib/api";
 
 export default function ContinuousDeliveryPage() {
-  const [apps, setApps] = useState<GitOpsApp[]>(initialApps);
-  const [selectedApp, setSelectedApp] = useState<GitOpsApp | null>(apps[0]);
+  const [apps, setApps] = useState<GitOpsApp[]>([]);
+  const [selectedApp, setSelectedApp] = useState<GitOpsApp | null>(null);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [showDiff, setShowDiff] = useState(false);
 
-  const handleSync = (name: string) => {
-    setIsSyncing(name);
-    setTimeout(() => {
-      setApps((prev) =>
-        prev.map((a) =>
-          a.name === name
-            ? {
-                ...a,
-                syncStatus: "Synced",
-                healthStatus: "Healthy",
-                lastSynced: "Just now",
-                resources: a.resources.map((r) => ({ ...r, status: "Synced", health: "Healthy" })),
-              }
-            : a
-        )
-      );
-      if (selectedApp?.name === name) {
-        setSelectedApp((prev) =>
-          prev
-            ? {
-                ...prev,
-                syncStatus: "Synced",
-                healthStatus: "Healthy",
-                lastSynced: "Just now",
-                resources: prev.resources.map((r) => ({ ...r, status: "Synced", health: "Healthy" })),
-              }
-            : null
-        );
+  const fetchApps = async () => {
+    setIsLoading(true);
+    try {
+      const res = await tarakFetch("/apis/gitops.tarak.io/v1/applications");
+      const items = res.data?.items || [];
+      setApps(items);
+      if (items.length > 0 && !selectedApp) {
+        setSelectedApp(items[0]);
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApps();
+  }, []);
+
+  const handleSync = async (name: string) => {
+    setIsSyncing(name);
+    try {
+      await tarakFetch(`/apis/gitops.tarak.io/v1/applications/${name}/sync`, { method: "POST" });
+      await fetchApps();
+    } finally {
       setIsSyncing(null);
-    }, 1200);
+    }
   };
 
   const filteredApps = apps.filter(
@@ -171,8 +112,8 @@ export default function ContinuousDeliveryPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setApps([...initialApps])}>
-            <RefreshCw size={14} className="mr-1.5" /> Refresh
+          <Button variant="outline" size="sm" onClick={fetchApps}>
+            <RefreshCw size={14} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <Button size="sm" className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white shadow-lg shadow-purple-900/30">
             <Plus size={14} className="mr-1.5" /> New Application

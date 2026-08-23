@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Radio,
   Sliders,
@@ -29,49 +29,28 @@ interface MeshPolicy {
   enabled: boolean;
 }
 
-const initialPolicies: MeshPolicy[] = [
-  {
-    id: "pol-1",
-    name: "orders-rate-limit",
-    type: "RateLimit",
-    mesh: "default",
-    targetRef: "service: orders-api",
-    rules: "100 req/s, burst: 50",
-    enabled: true,
-  },
-  {
-    id: "pol-2",
-    name: "payment-circuit-breaker",
-    type: "CircuitBreaker",
-    mesh: "default",
-    targetRef: "service: payments-service",
-    rules: "Max 50 conns, 5 consecutive 5xx ejections (30s)",
-    enabled: true,
-  },
-  {
-    id: "pol-3",
-    name: "chaos-delay-testing",
-    type: "FaultInjection",
-    mesh: "staging",
-    targetRef: "service: recommendation-engine",
-    rules: "200ms delay on 15% traffic",
-    enabled: false,
-  },
-  {
-    id: "pol-4",
-    name: "grpc-active-healthcheck",
-    type: "HealthCheck",
-    mesh: "default",
-    targetRef: "service: auth-grpc",
-    rules: "Interval: 5s, timeout: 2s, path: /grpc.health.v1.Health",
-    enabled: true,
-  },
-];
+import { tarakFetch } from "@/lib/api";
 
 export default function MeshPoliciesPage() {
-  const [policies, setPolicies] = useState<MeshPolicy[]>(initialPolicies);
+  const [policies, setPolicies] = useState<MeshPolicy[]>([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedType, setSelectedType] = useState<string>("All");
+
+  const fetchPolicies = async () => {
+    setIsLoading(true);
+    try {
+      const res = await tarakFetch("/apis/mesh.tarak.io/v1/proxypatches");
+      const items = res.data?.items || [];
+      setPolicies(items);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
 
   const togglePolicy = (id: string) => {
     setPolicies((prev) =>
@@ -87,7 +66,7 @@ export default function MeshPoliciesPage() {
     (p) =>
       (selectedType === "All" || p.type === selectedType) &&
       (p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.targetRef.toLowerCase().includes(search.toLowerCase()))
+        p.targetRef?.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -109,8 +88,8 @@ export default function MeshPoliciesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setPolicies([...initialPolicies])}>
-            <RefreshCw size={14} className="mr-1.5" /> Refresh
+          <Button variant="outline" size="sm" onClick={fetchPolicies}>
+            <RefreshCw size={14} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <Button size="sm" className="bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-950/40">
             <Plus size={14} className="mr-1.5" /> Create Mesh Policy

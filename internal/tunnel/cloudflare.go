@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -76,16 +75,10 @@ func (m *CloudflareManager) Start(ctx context.Context, localServerAddr string) e
 	// Check if cloudflared binary is available on host
 	cloudflaredPath, err := exec.LookPath("cloudflared")
 	if err != nil {
-		// Native virtual fallback: simulate tunnel endpoint or register mock quick tunnel URL
-		hostname, _ := os.Hostname()
-		mockURL := fmt.Sprintf("https://%s-tarak.trycloudflare.com", strings.ToLower(hostname))
-		m.status.Mode = "quick-tunnel (tcr-bridge)"
-		m.status.PublicURL = mockURL
-		m.log.Info("Cloudflare tunnel active (virtual bridge mode)",
-			zap.String("publicURL", mockURL),
-			zap.String("note", "install 'cloudflared' binary for live Cloudflare edge multiplexing"),
-		)
-		return nil
+		m.status.Mode = "binary-missing"
+		m.status.Active = false
+		m.log.Warn("cloudflared binary not found on host path; install 'cloudflared' to enable live Cloudflare ingress tunneling")
+		return fmt.Errorf("cloudflared binary not found in PATH")
 	}
 
 	var args []string

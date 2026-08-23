@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Shield,
   ShieldAlert,
@@ -44,95 +44,36 @@ interface Violation {
   remediation: string;
 }
 
-const initialRules: PolicyRule[] = [
-  {
-    name: "disallow-privileged-containers",
-    description: "Privileged containers can easily escalate host root access and are strictly forbidden.",
-    category: "Security",
-    severity: "High",
-    mode: "Enforce",
-    enabled: true,
-    matchKinds: ["Pod", "Deployment", "DaemonSet"],
-  },
-  {
-    name: "require-run-as-non-root",
-    description: "Containers must execute as a non-root user (UID > 0) to adhere to Pod Security Standards.",
-    category: "Security",
-    severity: "High",
-    mode: "Enforce",
-    enabled: true,
-    matchKinds: ["Pod", "Deployment"],
-  },
-  {
-    name: "require-resource-limits",
-    description: "All containers must define explicit CPU and memory request/limit bounds for fair scheduling.",
-    category: "Reliability",
-    severity: "Medium",
-    mode: "Audit",
-    enabled: true,
-    matchKinds: ["Pod", "Deployment", "StatefulSet"],
-  },
-  {
-    name: "disallow-host-namespaces",
-    description: "Sharing host PID, IPC, or Network namespaces breaks node isolation boundaries.",
-    category: "Security",
-    severity: "High",
-    mode: "Enforce",
-    enabled: true,
-    matchKinds: ["Pod"],
-  },
-  {
-    name: "require-read-only-rootfs",
-    description: "An immutable read-only root filesystem prevents runtime malware persistence inside containers.",
-    category: "BestPractices",
-    severity: "Medium",
-    mode: "Audit",
-    enabled: true,
-    matchKinds: ["Pod", "Deployment"],
-  },
-  {
-    name: "disallow-default-namespace",
-    description: "Workloads should be deployed into dedicated team namespaces rather than default.",
-    category: "BestPractices",
-    severity: "Low",
-    mode: "Audit",
-    enabled: true,
-    matchKinds: ["Pod", "Deployment", "Service"],
-  },
-];
 
-const initialViolations: Violation[] = [
-  {
-    id: "violation-101",
-    policyName: "disallow-default-namespace",
-    resource: "pod/default/frontend-proxy-7f89",
-    namespace: "default",
-    kind: "Pod",
-    message: "Workload deployed in 'default' namespace violates namespace governance rule.",
-    severity: "Low",
-    mode: "Audit",
-    time: "12 mins ago",
-    remediation: "Migrate pod manifest namespace to 'production' or 'staging'.",
-  },
-  {
-    id: "violation-102",
-    policyName: "require-resource-limits",
-    resource: "deployment/kube-system/metrics-agent",
-    namespace: "kube-system",
-    kind: "Deployment",
-    message: "Container 'collector' does not define resources.limits.cpu.",
-    severity: "Medium",
-    mode: "Audit",
-    time: "34 mins ago",
-    remediation: "Set resources.limits.cpu to '500m' and memory to '256Mi'.",
-  },
-];
+
+import { tarakFetch } from "@/lib/api";
 
 export default function PolicyDashboardPage() {
-  const [rules, setRules] = useState<PolicyRule[]>(initialRules);
-  const [violations, setViolations] = useState<Violation[]>(initialViolations);
+  const [rules, setRules] = useState<PolicyRule[]>([]);
+  const [violations, setViolations] = useState<Violation[]>([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"rules" | "violations">("rules");
+
+  const fetchPolicyData = async () => {
+    setIsLoading(true);
+    try {
+      const repRes = await tarakFetch("/apis/policy.tarak.io/v1/report");
+      if (repRes.data?.violations) {
+        setViolations(repRes.data.violations);
+      }
+      const rulesRes = await tarakFetch("/apis/policy.tarak.io/v1/rules");
+      if (rulesRes.data?.items) {
+        setRules(rulesRes.data.items);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPolicyData();
+  }, []);
 
   const toggleRuleMode = (name: string) => {
     setRules((prev) =>
@@ -176,8 +117,8 @@ export default function PolicyDashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setRules([...initialRules])}>
-            <RefreshCw size={14} className="mr-1.5" /> Re-scan Cluster
+          <Button variant="outline" size="sm" onClick={fetchPolicyData}>
+            <RefreshCw size={14} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} /> Re-scan Cluster
           </Button>
           <Button size="sm" className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white shadow-lg shadow-purple-900/30">
             <Plus size={14} className="mr-1.5" /> Create ClusterPolicy

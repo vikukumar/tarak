@@ -64,7 +64,7 @@ func (ppm *ProxyPatchManager) seedDefaultPatches() {
 		TargetService: "storefront-web",
 		Stage:         StageRequestHeaders,
 		AddHeaders: map[string]string{
-			"X-Tarak-Mesh-Origin": "tarak-native-gateway",
+			"X-Tarak-Mesh-Origin":  "tarak-native-gateway",
 			"X-ZeroTrust-Verified": "true",
 		},
 		Enabled: true,
