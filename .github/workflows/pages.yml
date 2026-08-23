@@ -57,27 +57,21 @@ jobs:
       - name: Prepare Documentation Distribution for GitHub Pages
         run: |
           echo "Synchronizing Vite React artifacts into docs..."
+          rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
           mkdir -p docs/assets docs/data
-
-          # Sync canonical assets into web/dist and docs/assets
-          if [ -d "docs/assets" ]; then
-            cp -r docs/assets/* web/dist/assets/ 2>/dev/null || true
-          fi
 
           # Copy compiled Vite assets into docs
           if [ -d "web/dist" ]; then
             echo "Copying web/dist into docs..."
-            cp -r web/dist/* docs/ 2>/dev/null || true
+            cp -r web/dist/* docs/
           fi
 
-          # Ensure CNAME is set for custom domain
-          if [ ! -f "docs/CNAME" ]; then
-            echo "tarak.vikshro.in" > docs/CNAME
-          fi
+          # Ensure CNAME and .nojekyll are set
+          echo "tarak.vikshro.in" > docs/CNAME
+          touch docs/.nojekyll
 
           echo "Documentation distribution prepared successfully:"
           ls -la docs/
-          ls -la docs/assets/ || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

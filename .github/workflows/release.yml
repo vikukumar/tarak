@@ -69,8 +69,11 @@ jobs:
           npm ci || npm install
           npm run build
           cd ..
+          rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
           mkdir -p docs/assets docs/data
-          cp -r web/dist/* docs/ 2>/dev/null || true
+          cp -r web/dist/* docs/
+          echo "tarak.vikshro.in" > docs/CNAME
+          touch docs/.nojekyll
           echo "Vite documentation portal successfully prepared in docs/"
 
       - name: Set up Go
@@ -183,8 +186,11 @@ jobs:
           cp -r dashboard/out/* internal/ui/dist/
 
           (cd web && (npm ci || npm install) && npm run build)
+          rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
           mkdir -p docs/assets docs/data
-          cp -r web/dist/* docs/ 2>/dev/null || true
+          cp -r web/dist/* docs/
+          echo "tarak.vikshro.in" > docs/CNAME
+          touch docs/.nojekyll
 
           # Configure Git
           git config user.name "github-actions[bot]"

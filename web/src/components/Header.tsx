@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         className="flex items-center no-underline z-50 flex-shrink-0"
       >
         <img
-          src="/assets/tarak_logo_horizontal.png"
+          src="assets/tarak_logo_horizontal.png"
           alt="TARAK"
           className="h-11 w-auto min-w-[150px] max-w-[220px] object-contain drop-shadow-[0_0_16px_rgba(0,240,255,0.4)] hover:scale-105 transition-transform"
         />

@@ -14,11 +14,14 @@ Set-Location ..
 # 4. Copy clean Next.js export into internal/ui/dist
 Copy-Item -Path ".\dashboard\out\*" -Destination ".\internal\ui\dist" -Recurse -Force
 
-# 5. Sync canonical assets
-if (Test-Path ".\docs\assets") {
-    Copy-Item -Path ".\docs\assets\*" -Destination ".\web\public\assets" -Recurse -Force -ErrorAction SilentlyContinue
-    Copy-Item -Path ".\docs\assets\*" -Destination ".\dashboard\public\assets" -Recurse -Force -ErrorAction SilentlyContinue
-}
+# 5. Sync Vite build into docs/
+Remove-Item -Path ".\docs\data", ".\docs\*.html", ".\docs\*.js", ".\docs\*.css" -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path ".\docs\data" | Out-Null
+
+Copy-Item -Path ".\web\dist\*" -Destination ".\docs" -Recurse -Force
+
+Set-Content -Path ".\docs\CNAME" -Value "tarak.vikshro.in"
+New-Item -ItemType File -Force -Path ".\docs\.nojekyll" | Out-Null
 
 # 6. Compile all 5 Go Binaries
 & "C:\Program Files\Go\bin\go.exe" build -o bin/tarak.exe ./cmd/tarak

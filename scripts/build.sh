@@ -14,12 +14,12 @@ rm -rf internal/ui/dist/*
 mkdir -p internal/ui/dist
 cp -r dashboard/out/* internal/ui/dist/
 
-# 5. Sync canonical docs assets into web/public and dashboard/public
-if [ -d "docs/assets" ]; then
-  mkdir -p web/public/assets dashboard/public/assets
-  cp -r docs/assets/* web/public/assets/ 2>/dev/null || true
-  cp -r docs/assets/* dashboard/public/assets/ 2>/dev/null || true
-fi
+# 5. Sync Vite build into docs/
+rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
+mkdir -p docs/assets docs/data
+cp -r web/dist/* docs/
+echo "tarak.vikshro.in" > docs/CNAME
+touch docs/.nojekyll
 
 # 6. Compile all 5 Go Binaries
 mkdir -p bin
