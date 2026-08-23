@@ -237,7 +237,7 @@ func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nod
 				"osImage":                 fmt.Sprintf("Tarak Native (%s/%s)", runtime.GOOS, runtime.GOARCH),
 				"architecture":            runtime.GOARCH,
 				"operatingSystem":         runtime.GOOS,
-				"containerRuntimeVersion": "tcr://" + version.Version,
+				"containerRuntimeVersion": "tarak-runtime://v" + version.Version,
 			},
 			"addresses": []map[string]interface{}{
 				{"type": "InternalIP", "address": netInfo.PrimaryLANIP},

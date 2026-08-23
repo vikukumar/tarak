@@ -102,7 +102,7 @@ export default function NodesPage() {
       header: "Container Runtime",
       render: (n) => (
         <span className="text-cyan-300 font-mono text-[11px]">
-          {n.status?.nodeInfo?.containerRuntimeVersion || "tarak-runtime://v1.30.0"}
+          {n.status?.nodeInfo?.containerRuntimeVersion || "tarak-runtime://v1.0.6"}
         </span>
       ),
     },

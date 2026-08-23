@@ -2219,9 +2219,9 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 				}
 			}
 			age := formatAge(time.Since(n.Metadata.CreationTimestamp))
-			version := n.Status.NodeInfo.KubeletVersion
-			if version == "" {
-				version = "v1.30.0-tarak"
+			nodeVer := n.Status.NodeInfo.KubeletVersion
+			if nodeVer == "" {
+				nodeVer = "v" + version.Version + "-tarak"
 			}
 			displayName := n.Metadata.Name
 			if prefixName {
@@ -2246,15 +2246,15 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 				if kernel == "" {
 					kernel = "tarak-runtime"
 				}
-				runtime := n.Status.NodeInfo.ContainerRuntimeVersion
-				if runtime == "" {
-					runtime = "tarak://v1.30.0"
+				rtVer := n.Status.NodeInfo.ContainerRuntimeVersion
+				if rtVer == "" {
+					rtVer = "tarak-runtime://v" + version.Version
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-					displayName, status, roles, age, version, internalIP, externalIP, osImage, kernel, runtime)
+					displayName, status, roles, age, nodeVer, internalIP, externalIP, osImage, kernel, rtVer)
 			} else {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					displayName, status, roles, age, version)
+					displayName, status, roles, age, nodeVer)
 			}
 		}
 

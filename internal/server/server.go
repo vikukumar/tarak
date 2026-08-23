@@ -797,7 +797,7 @@ func (s *Server) serveOpenAPI(w http.ResponseWriter, r *http.Request) {
 		"swagger": "2.0",
 		"info": map[string]interface{}{
 			"title":   "Tarak Kubernetes-Compatible API",
-			"version": "v1.30.0",
+			"version": "v" + version.Version,
 		},
 		"paths": map[string]interface{}{
 			"/api/v1": map[string]interface{}{
@@ -917,10 +917,10 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 				"pods":              "110",
 			},
 			"nodeInfo": map[string]interface{}{
-				"kubeletVersion":          "v1.30.0-tarak",
+				"kubeletVersion":          "v" + version.Version + "-tarak",
 				"osImage":                 fmt.Sprintf("Tarak Native (%s/%s)", runtime.GOOS, runtime.GOARCH),
 				"kernelVersion":           runtime.Version(),
-				"containerRuntimeVersion": "tarak-runtime://v1.30.0",
+				"containerRuntimeVersion": "tarak-runtime://v" + version.Version,
 				"architecture":            runtime.GOARCH,
 				"operatingSystem":         runtime.GOOS,
 			},
