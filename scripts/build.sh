@@ -11,10 +11,11 @@ rm -rf internal/ui/dist/*
 mkdir -p internal/ui/dist
 cp -r dashboard/out/* internal/ui/dist/
 
-# 4. Sync web assets into docs
-if [ -d "web/public" ]; then
-  mkdir -p docs
-  cp -r web/public/* docs/ 2>/dev/null || true
+# 4. Sync canonical docs assets into web/public and dashboard/public
+if [ -d "docs/assets" ]; then
+  mkdir -p web/public/assets dashboard/public/assets
+  cp -r docs/assets/* web/public/assets/ 2>/dev/null || true
+  cp -r docs/assets/* dashboard/public/assets/ 2>/dev/null || true
 fi
 
 # 5. Compile all 5 Go Binaries

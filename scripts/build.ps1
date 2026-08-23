@@ -9,9 +9,10 @@ cd ..
 # 3. Copy clean Next.js export into internal/ui/dist
 Copy-Item -Path ".\dashboard\out\*" -Destination ".\internal\ui\dist" -Recurse -Force
 
-# 4. Sync web assets into docs
-if (Test-Path ".\web\public") {
-    Copy-Item -Path ".\web\public\*" -Destination ".\docs" -Recurse -Force -ErrorAction SilentlyContinue
+# 4. Sync canonical docs assets into web/public and dashboard/public
+if (Test-Path ".\docs\assets") {
+    Copy-Item -Path ".\docs\assets\*" -Destination ".\web\public\assets" -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item -Path ".\docs\assets\*" -Destination ".\dashboard\public\assets" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # 5. Compile all 5 Go Binaries
