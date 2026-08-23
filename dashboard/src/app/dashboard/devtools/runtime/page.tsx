@@ -9,6 +9,7 @@ import { tarakFetch } from "@/lib/api";
 
 export default function RuntimeExplorerPage() {
   const [versionInfo, setVersionInfo] = useState<any>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<any>(null);
   const [nodes, setNodes] = useState<any[]>([]);
   const [pods, setPods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,14 +17,25 @@ export default function RuntimeExplorerPage() {
   const fetchRuntimeData = async () => {
     setIsLoading(true);
     try {
-      const [verRes, nodeRes, podRes] = await Promise.all([
+      const [verRes, statusRes, nodeRes, podRes] = await Promise.allSettled([
         tarakFetch("/version"),
+        tarakFetch("/apis/runtime.tarak.io/v1/status"),
         tarakFetch("/api/v1/nodes"),
         tarakFetch("/api/v1/pods"),
       ]);
-      setVersionInfo(verRes.data || {});
-      setNodes(nodeRes.data?.items || []);
-      setPods(podRes.data?.items || []);
+
+      if (verRes.status === "fulfilled" && verRes.value.data) {
+        setVersionInfo(verRes.value.data);
+      }
+      if (statusRes.status === "fulfilled" && statusRes.value.data) {
+        setRuntimeStatus(statusRes.value.data);
+      }
+      if (nodeRes.status === "fulfilled" && nodeRes.value.data?.items) {
+        setNodes(nodeRes.value.data.items);
+      }
+      if (podRes.status === "fulfilled" && podRes.value.data?.items) {
+        setPods(podRes.value.data.items);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -38,6 +50,12 @@ export default function RuntimeExplorerPage() {
   const nodeStatus = primaryNode.status || {};
   const alloc = nodeStatus.allocatable || {};
   const nodeInfo = nodeStatus.nodeInfo || {};
+  const hw = runtimeStatus?.hardware || {};
+
+  const runtimeVersion =
+    runtimeStatus?.runtime?.runtimeVersion ||
+    nodeInfo.containerRuntimeVersion ||
+    "tarak-runtime://tcr-native";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -76,13 +94,13 @@ export default function RuntimeExplorerPage() {
           </div>
           <div className="mt-4 space-y-2">
             <div className="text-lg font-bold text-white font-mono">
-              {nodeInfo.containerRuntimeVersion || "tarak-runtime://tcr-native"}
+              {runtimeVersion}
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               OCI Image extraction, layer unpacker, and live process isolation sandbox.
             </p>
             <div className="pt-2 text-[11px] font-mono text-cyan-300">
-              API Server: {versionInfo.gitVersion || "v1.0.6-tarak"} ({versionInfo.goVersion || "go1.26.2"})
+              API Server: {versionInfo?.gitVersion || "v1.0.6-tarak"} ({versionInfo?.goVersion || "go1.26.2"})
             </div>
           </div>
         </Card>
@@ -97,11 +115,11 @@ export default function RuntimeExplorerPage() {
           <div className="mt-4 space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Host CPU Cores:</span>
-              <strong className="text-white font-mono">{alloc.cpu || "16 Cores"}</strong>
+              <strong className="text-white font-mono">{hw.cpuCores || alloc.cpu || "8 Cores"}</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Total Host Memory:</span>
-              <strong className="text-white font-mono">{nodeLabels["tarak.io/total-memory-gb"] || alloc.memory || "16Gi"}</strong>
+              <span className="text-slate-400">Physical Memory:</span>
+              <strong className="text-white font-mono">{hw.memoryTotal || nodeLabels["tarak.io/total-memory-gb"] || alloc.memory || "16.0 GiB"}</strong>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">GPU Accelerator:</span>

@@ -57,10 +57,9 @@ func SampleSystemMetrics() SysHardwareMetrics {
 		memPct = float64(usedMem) / float64(totalMem) * 100.0
 	}
 
-	// In absence of native CGO performance counters, we don't hallucinate node CPU.
-	// It stays at authentic zero unless Docker/WMI implements a proper collector.
 	var usedMillicores int64 = 0
 	var baseCPUPercent float64 = 0.0
+	getSystemCPU(numCPU, &baseCPUPercent, &usedMillicores)
 
 	res := SysHardwareMetrics{
 		TotalMemoryBytes: totalMem,

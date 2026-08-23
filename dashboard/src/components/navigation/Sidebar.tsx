@@ -64,6 +64,8 @@ export const navigationConfig: NavItem[] = [
       { title: "Namespaces", href: "/dashboard/cluster/namespaces", icon: Globe },
       { title: "ConfigMaps & Secrets", href: "/dashboard/cluster/configmaps", icon: Database },
       { title: "Storage (PVC / SC)", href: "/dashboard/cluster/storage", icon: Database },
+      { title: "Custom Resources (CRDs)", href: "/dashboard/cluster/crds", icon: FileCode, badge: "CRD" },
+      { title: "API Resources Catalog", href: "/dashboard/cluster/resources", icon: Server },
     ],
   },
   {
