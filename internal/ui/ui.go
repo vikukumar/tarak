@@ -29,8 +29,13 @@ func Handler() http.Handler {
 		// Strip /dashboard prefix if present
 		cleanPath := strings.TrimPrefix(reqPath, "/dashboard")
 		cleanPath = strings.TrimPrefix(cleanPath, "/")
-		if cleanPath == "" {
-			cleanPath = "index.html"
+		if cleanPath == "" || cleanPath == "index.html" {
+			if content, err := fs.ReadFile(distFS, "index.html"); err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(content)
+				return
+			}
 		}
 
 		// If the specific file exists in the embedded FS, serve it
@@ -43,8 +48,12 @@ func Handler() http.Handler {
 		}
 
 		// Fallback to index.html for Single Page Application (SPA) client-side routing
-		r2 := r.Clone(r.Context())
-		r2.URL.Path = "/index.html"
-		fileServer.ServeHTTP(w, r2)
+		if content, err := fs.ReadFile(distFS, "index.html"); err == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(content)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
 	})
 }
