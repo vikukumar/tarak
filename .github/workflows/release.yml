@@ -69,7 +69,7 @@ jobs:
           npm ci || npm install
           npm run build
           cd ..
-          rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
+          rm -rf docs/data docs/*.html docs/*.js docs/*.css
           mkdir -p docs/assets docs/data
           cp -r web/dist/* docs/
           echo "tarak.vikshro.in" > docs/CNAME

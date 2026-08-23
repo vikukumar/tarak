@@ -57,7 +57,7 @@ jobs:
       - name: Prepare Documentation Distribution for GitHub Pages
         run: |
           echo "Synchronizing Vite React artifacts into docs..."
-          rm -rf docs/assets docs/data docs/*.html docs/*.js docs/*.css
+          rm -rf docs/data docs/*.html docs/*.js docs/*.css
           mkdir -p docs/assets docs/data
 
           # Copy compiled Vite assets into docs
