@@ -31,9 +31,9 @@ func (s *Server) HandlePodExec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Command) == 0 {
-		cmdQuery := r.URL.Query().Get("command")
-		if cmdQuery != "" {
-			req.Command = strings.Fields(cmdQuery)
+		cmds := r.URL.Query()["command"]
+		if len(cmds) > 0 {
+			req.Command = cmds
 		} else {
 			req.Command = []string{"sh", "-c", "uname -a && uptime"}
 		}

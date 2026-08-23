@@ -3572,7 +3572,29 @@ func newExecCmd() *cobra.Command {
 				return fmt.Errorf("Error from server (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 			}
 
-			_, err = io.Copy(os.Stdout, resp.Body)
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var execResp struct {
+				Stdout   string `json:"stdout"`
+				Stderr   string `json:"stderr"`
+				ExitCode int    `json:"exitCode"`
+			}
+			if err := json.Unmarshal(body, &execResp); err == nil && (execResp.Stdout != "" || execResp.Stderr != "" || execResp.ExitCode != 0) {
+				if execResp.Stdout != "" {
+					fmt.Print(execResp.Stdout)
+				}
+				if execResp.Stderr != "" {
+					fmt.Fprint(os.Stderr, execResp.Stderr)
+				}
+				if execResp.ExitCode != 0 {
+					return fmt.Errorf("command terminated with exit code %d", execResp.ExitCode)
+				}
+				return nil
+			}
+
+			_, err = os.Stdout.Write(body)
 			return err
 		},
 	}

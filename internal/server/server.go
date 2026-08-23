@@ -450,7 +450,7 @@ func (s *Server) Run(ctx context.Context) error {
 		registerAutoscalingResources("autoscaling.tarak.io", "v1", r, s.store, wh, s.log)
 	})
 
-	// Policy API groups (PDB)
+	// Policy API groups (PDB & Kyverno-compatible Policy Engine)
 	r.Route("/apis/policy/v1", func(r chi.Router) {
 		r.Get("/", s.serveAPIResourceList("policy", "v1"))
 		registerPolicyResourceDescriptors("policy", "v1", r, s.store, wh, s.log)
@@ -458,6 +458,16 @@ func (s *Server) Run(ctx context.Context) error {
 	r.Route("/apis/policy.tarak.io/v1", func(r chi.Router) {
 		r.Get("/", s.serveAPIResourceList("policy.tarak.io", "v1"))
 		registerPolicyResourceDescriptors("policy.tarak.io", "v1", r, s.store, wh, s.log)
+		r.Get("/report", func(w http.ResponseWriter, req *http.Request) {
+			rep := s.policyEngine.GetReport(req.Context())
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(rep)
+		})
+		r.Get("/rules", func(w http.ResponseWriter, req *http.Request) {
+			rules := s.policyEngine.ListRules()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": rules})
+		})
 	})
 
 	// Helm API groups
@@ -526,19 +536,6 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Delete("/namespaces/{namespace}/policies/{name}", s.zeroTrustMgr.HandleDeletePolicy)
 	})
 
-	// ── Kyverno-Compatible Policy Engine API ──────────────────────────────
-	r.Route("/apis/policy.tarak.io/v1", func(r chi.Router) {
-		r.Get("/report", func(w http.ResponseWriter, req *http.Request) {
-			rep := s.policyEngine.GetReport(req.Context())
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(rep)
-		})
-		r.Get("/rules", func(w http.ResponseWriter, req *http.Request) {
-			rules := s.policyEngine.ListRules()
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": rules})
-		})
-	})
 
 	// ── GitOps Continuous Delivery API (ArgoCD Equivalent) ────────────────
 	r.Route("/apis/gitops.tarak.io/v1", func(r chi.Router) {

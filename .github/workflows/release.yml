@@ -51,10 +51,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'dashboard/package-lock.json'
 
-      - name: Build Next.js Dashboard UI
+      - name: Build Next.js Dashboard & Vite Web Portal
         run: |
           echo "Building Next.js Dashboard UI..."
           cd dashboard
@@ -65,6 +63,15 @@ jobs:
           rm -rf internal/ui/dist/*
           cp -r dashboard/out/* internal/ui/dist/
           echo "Embedded Next.js UI successfully prepared in internal/ui/dist/"
+
+          echo "Building Vite React Web Portal..."
+          cd web
+          npm ci || npm install
+          npm run build
+          cd ..
+          mkdir -p docs/assets docs/data
+          cp -r web/dist/* docs/ 2>/dev/null || true
+          echo "Vite documentation portal successfully prepared in docs/"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -170,12 +177,12 @@ jobs:
 
           # 3. Rebuild Next.js UI & Web React app with new version
           echo "Rebuilding embedded dashboard UI & web portal with new version $NEW_TAG..."
-          (cd dashboard && npm run build)
+          (cd dashboard && (npm ci || npm install) && npm run build)
           mkdir -p internal/ui/dist
           rm -rf internal/ui/dist/*
           cp -r dashboard/out/* internal/ui/dist/
 
-          (cd web && npm run build)
+          (cd web && (npm ci || npm install) && npm run build)
           mkdir -p docs/assets docs/data
           cp -r web/dist/* docs/ 2>/dev/null || true
 
