@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -755,15 +756,7 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 		}
 
 		if svcType == "LoadBalancer" {
-			targetIP := "100.97.82.54"
-			if m.netDriver != nil {
-				if lan := m.netDriver.GetHostNetworkInfo().PrimaryLANIP; lan != "" {
-					targetIP = lan
-				}
-			}
-			if lbIP, _ := spec["loadBalancerIP"].(string); lbIP != "" {
-				targetIP = lbIP
-			}
+			targetIP := m.resolveServiceExternalIP(ctx, spec, meta)
 
 			status, _ := svc["status"].(map[string]interface{})
 			if status == nil {
@@ -788,7 +781,7 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 				}
 				svc["status"] = status
 				needsUpdate = true
-				m.log.Info("tarak metallb controller assigned public IP to service", zap.String("service", name), zap.String("externalIP", targetIP))
+				m.log.Info("tarak metallb controller dynamically assigned IP to service", zap.String("service", name), zap.String("externalIP", targetIP))
 			}
 		}
 
@@ -840,4 +833,60 @@ func randomSuffix(length int) string {
 		out[i] = chars[int(v)%len(chars)]
 	}
 	return string(out)
+}
+
+// resolveServiceExternalIP dynamically detects the IP for LoadBalancer services from spec, annotations, network driver, or host interfaces.
+func (m *Manager) resolveServiceExternalIP(ctx context.Context, spec, meta map[string]interface{}) string {
+	// 1. Explicit user request in spec.loadBalancerIP
+	if lbIP, _ := spec["loadBalancerIP"].(string); lbIP != "" {
+		return lbIP
+	}
+
+	// 2. Explicit user request in annotations
+	if annotations, ok := meta["annotations"].(map[string]interface{}); ok {
+		if annIP, ok := annotations["metallb.universe.tf/loadBalancerIPs"].(string); ok && annIP != "" {
+			return annIP
+		}
+		if annIP, ok := annotations["tarak.io/external-ip"].(string); ok && annIP != "" {
+			return annIP
+		}
+	}
+
+	// 3. Dynamic query from live network bridge driver (Primary LAN IP / Public IP)
+	if m.netDriver != nil {
+		netInfo := m.netDriver.GetHostNetworkInfo()
+		if netInfo.PrimaryLANIP != "" && netInfo.PrimaryLANIP != "127.0.0.1" {
+			return netInfo.PrimaryLANIP
+		}
+		if netInfo.PublicIP != "" && netInfo.PublicIP != "127.0.0.1" {
+			return netInfo.PublicIP
+		}
+	}
+
+	// 4. Dynamic query from loadbalancer controller detector / pool
+	if m.lbCtrl != nil {
+		if pub := m.lbCtrl.PublicIP(); pub != "" && pub != "127.0.0.1" {
+			return pub
+		}
+	}
+
+	// 5. Dynamic fallback: probe host network interfaces for first active IPv4
+	if ifaces, err := net.Interfaces(); err == nil {
+		for _, iface := range ifaces {
+			if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagLoopback) != 0 {
+				continue
+			}
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.To4() != nil && !ipNet.IP.IsLoopback() {
+					return ipNet.IP.String()
+				}
+			}
+		}
+	}
+
+	return "127.0.0.1"
 }
