@@ -79,9 +79,11 @@ export const MobileBottomNav: React.FC = () => {
           <div className="relative bg-[#0b1329] border-t border-white/15 rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto z-10 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center font-bold text-slate-950 text-xs">
-                  T
-                </div>
+                <img
+                  src="/assets/icon.png"
+                  alt="Tarak Icon"
+                  className="w-7 h-7 rounded-lg object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.4)]"
+                />
                 <span className="font-bold text-white text-sm">Cluster Navigation</span>
               </div>
               <button

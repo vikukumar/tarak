@@ -24,8 +24,12 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#070c18]">
       <div className="w-full max-w-md">
         <Card className="border border-white/10 p-8 shadow-2xl space-y-6">
-          <div className="text-center space-y-1">
-            <h1 className="text-xl font-bold text-white">Join Tarak Cluster</h1>
+          <div className="text-center flex flex-col items-center">
+            <img
+              src="/assets/tarak_logo_vertical.png"
+              alt="TARAK Platform"
+              className="w-40 object-contain drop-shadow-[0_0_20px_rgba(0,240,255,0.3)] mb-2"
+            />
             <p className="text-xs text-slate-400">Developer self-service account registration</p>
           </div>
 

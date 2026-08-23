@@ -27,11 +27,13 @@ export default function ForgotPasswordPage() {
             <span>Back to Sign In</span>
           </Link>
 
-          <div>
-            <h1 className="text-xl font-bold text-white">Reset Cluster Access</h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Enter your administrative email or generate a new bootstrap PAT via CLI
-            </p>
+          <div className="text-center flex flex-col items-center">
+            <img
+              src="/assets/tarak_logo_vertical.png"
+              alt="TARAK Platform"
+              className="w-40 object-contain drop-shadow-[0_0_20px_rgba(0,240,255,0.3)] mb-2"
+            />
+            <p className="text-xs text-slate-400">Reset cluster administrative credentials</p>
           </div>
 
           {submitted ? (

@@ -36,9 +36,13 @@ export default function DashboardShellLayout({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#070c18]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 animate-pulse" />
-          <span className="text-xs text-slate-400">Loading Tarak Control Plane...</span>
+        <div className="flex flex-col items-center gap-4">
+          <img
+            src="/assets/icon.png"
+            alt="TARAK"
+            className="w-12 h-12 object-contain animate-pulse drop-shadow-[0_0_20px_rgba(0,240,255,0.5)]"
+          />
+          <span className="text-xs text-slate-400 font-medium">Loading Tarak Control Plane...</span>
         </div>
       </div>
     );
@@ -48,9 +52,11 @@ export default function DashboardShellLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#070c18] p-4">
         <div className="max-w-md w-full glass-panel rounded-2xl p-8 border border-white/10 text-center space-y-6 shadow-2xl">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 mx-auto flex items-center justify-center font-bold text-slate-950 text-2xl shadow-[0_0_30px_rgba(0,240,255,0.3)]">
-            T
-          </div>
+          <img
+            src="/assets/tarak_logo_vertical.png"
+            alt="TARAK Platform"
+            className="w-44 object-contain mx-auto drop-shadow-[0_0_25px_rgba(0,240,255,0.35)]"
+          />
           <div className="space-y-1.5">
             <h2 className="text-xl font-bold text-white tracking-tight">Authentication Required</h2>
             <p className="text-xs text-slate-400">
