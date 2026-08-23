@@ -1,194 +1,186 @@
-import React, { useState } from 'react';
-import { Activity, ShieldCheck, AlertTriangle, ArrowRight, Filter, Zap, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, ShieldCheck, AlertTriangle, ArrowRight, Filter, Zap, Globe, RefreshCw } from 'lucide-react';
 
 interface Props {
   namespace: string;
 }
 
+interface NetworkFlow {
+  id: string;
+  timestamp: string;
+  srcPod: string;
+  srcNS: string;
+  srcIP: string;
+  dstPod: string;
+  dstNS: string;
+  dstIP: string;
+  dstPort: number;
+  protocol: string;
+  verdict: string;
+  statusCode: number;
+  latencyMs: number;
+  bytes: number;
+  summary: string;
+}
+
 export const HubbleVisualizer: React.FC<Props> = ({ namespace }) => {
   const [protocolFilter, setProtocolFilter] = useState<string>('ALL');
+  const [flows, setFlows] = useState<NetworkFlow[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const flows = [
-    {
-      id: 'flow-1',
-      time: 'Just now',
-      src: 'storefront-ingress',
-      srcNs: 'default',
-      dst: 'storefront-web',
-      dstNs: 'default',
-      proto: 'HTTP',
-      port: 80,
-      verdict: 'FORWARDED',
-      code: 200,
-      latency: '0.8ms',
-      summary: 'GET /api/v1/products (200 OK)'
-    },
-    {
-      id: 'flow-2',
-      time: '1s ago',
-      src: 'storefront-web',
-      srcNs: 'default',
-      dst: 'auth-service',
-      dstNs: 'default',
-      proto: 'TCP',
-      port: 50051,
-      verdict: 'FORWARDED',
-      code: 200,
-      latency: '1.2ms',
-      summary: 'gRPC SessionValidation'
-    },
-    {
-      id: 'flow-3',
-      time: '2s ago',
-      src: 'auth-service',
-      srcNs: 'default',
-      dst: 'db-primary-0',
-      dstNs: 'tarak-system',
-      proto: 'TCP',
-      port: 5432,
-      verdict: 'FORWARDED',
-      code: 200,
-      latency: '0.4ms',
-      summary: 'PostgreSQL TLS Connection'
-    },
-    {
-      id: 'flow-4',
-      time: '4s ago',
-      src: 'unknown-crawler',
-      srcNs: 'tarak-public',
-      dst: 'db-primary-0',
-      dstNs: 'tarak-system',
-      proto: 'TCP',
-      port: 5432,
-      verdict: 'DROPPED',
-      code: 403,
-      latency: '0.1ms',
-      summary: 'Zero-Trust NetworkPolicy Blocked'
+  const fetchFlows = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/apis/telemetry.tarak.io/v1/flows');
+      if (res.ok) {
+        const data = await res.json();
+        setFlows(data.items || []);
+      }
+    } catch {
+      // Fallback gracefully
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
-  const filtered = flows.filter(f => protocolFilter === 'ALL' || f.proto === protocolFilter);
+  useEffect(() => {
+    fetchFlows();
+    const interval = setInterval(fetchFlows, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredFlows = flows.filter(f => {
+    if (protocolFilter !== 'ALL' && f.protocol !== protocolFilter) return false;
+    return true;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Metrics Banner */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+      {/* Hubble Flow Top Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>Traffic Throughput</span>
-          <h3 style={{ color: 'var(--accent-cyan)', fontSize: '1.6rem', marginTop: '0.2rem' }}>4.8k req/s</h3>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>TOTAL NETWORK FLOWS</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>{flows.length}</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Live telemetry buffer</div>
         </div>
+
         <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>P95 Latency</span>
-          <h3 style={{ color: 'var(--accent-emerald)', fontSize: '1.6rem', marginTop: '0.2rem' }}>0.94 ms</h3>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>FORWARDED PACKETS</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+            {flows.filter(f => f.verdict === 'FORWARDED').length}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>mTLS authenticated</div>
         </div>
+
         <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>Zero-Trust Dropped</span>
-          <h3 style={{ color: '#fb7185', fontSize: '1.6rem', marginTop: '0.2rem' }}>14 pkts</h3>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>ZERO-TRUST BLOCKED</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
+            {flows.filter(f => f.verdict === 'DROPPED').length}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Unauthorized lateral attempts</div>
         </div>
       </div>
 
-      {/* Network Topology Visual Flow Chart */}
-      <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <h3 style={{ color: '#fff', fontSize: '1.15rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <Activity size={18} color="var(--accent-cyan)" /> Live Hubble Service-to-Service Graph
-        </h3>
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1.5rem'
-        }}>
-          {/* Node Ingress */}
-          <div style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid var(--accent-cyan)', borderRadius: 10, padding: '1rem 1.5rem' }}>
-            <Globe size={24} color="var(--accent-cyan)" style={{ marginBottom: 4 }} />
-            <h5 style={{ color: '#fff', margin: 0 }}>Cloudflare Ingress</h5>
-            <small style={{ color: 'var(--text-muted)' }}>store.vikshro.in</small>
+      {/* Realtime Flows Table */}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Activity size={20} color="var(--accent-cyan)" />
+            <h3 style={{ color: '#fff', fontSize: '1.1rem' }}>Hubble Realtime Traffic Flows</h3>
+            <span style={{
+              background: 'rgba(57, 255, 20, 0.15)',
+              color: 'var(--accent-green)',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}>
+              POLLING LIVE (3s)
+            </span>
           </div>
 
-          <div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>⟶ 0.8ms ⟶</div>
-
-          {/* Node Web App */}
-          <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid var(--accent-purple)', borderRadius: 10, padding: '1rem 1.5rem' }}>
-            <Zap size={24} color="var(--accent-purple)" style={{ marginBottom: 4 }} />
-            <h5 style={{ color: '#fff', margin: 0 }}>storefront-web</h5>
-            <small style={{ color: 'var(--text-muted)' }}>3 Replicas</small>
-          </div>
-
-          <div style={{ color: 'var(--accent-purple)', fontWeight: 700 }}>⟶ 1.2ms ⟶</div>
-
-          {/* Node Auth Service */}
-          <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--accent-emerald)', borderRadius: 10, padding: '1rem 1.5rem' }}>
-            <ShieldCheck size={24} color="var(--accent-emerald)" style={{ marginBottom: 4 }} />
-            <h5 style={{ color: '#fff', margin: 0 }}>auth-service</h5>
-            <small style={{ color: 'var(--text-muted)' }}>Tailscale Mesh</small>
-          </div>
-        </div>
-      </div>
-
-      {/* Real-time Flows Table */}
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '0.9rem 1.25rem', background: 'rgba(15, 23, 42, 0.8)', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h4 style={{ color: '#fff', fontSize: '0.95rem', margin: 0 }}>Recent Network Flow Events</h4>
-          <div style={{ display: 'flex', gap: '0.35rem' }}>
-            {['ALL', 'HTTP', 'TCP', 'UDP'].map(p => (
-              <button
-                key={p}
-                onClick={() => setProtocolFilter(p)}
-                style={{
-                  background: protocolFilter === p ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
-                  color: protocolFilter === p ? 'var(--accent-cyan)' : 'var(--text-muted)',
-                  border: protocolFilter === p ? '1px solid rgba(0, 240, 255, 0.4)' : '1px solid transparent',
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 700 }}>
-            <thead>
-              <tr style={{ background: 'rgba(10, 15, 30, 0.9)', borderBottom: '1px solid var(--border-glass)' }}>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>TIME</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>SOURCE</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>DESTINATION</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>PROTO</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>VERDICT</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>LATENCY</th>
-                <th style={{ padding: '0.75rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>SUMMARY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((f, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                  <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{f.time}</td>
-                  <td style={{ padding: '0.85rem 1.25rem', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{f.src}</td>
-                  <td style={{ padding: '0.85rem 1.25rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{f.dst}:{f.port}</td>
-                  <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{f.proto}</td>
-                  <td style={{ padding: '0.85rem 1.25rem' }}>
-                    {f.verdict === 'FORWARDED' ? (
-                      <span className="badge badge-emerald">Forwarded</span>
-                    ) : (
-                      <span className="badge badge-purple" style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#fb7185', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
-                        Dropped
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '0.85rem 1.25rem', color: 'var(--accent-emerald)', fontSize: '0.82rem', fontFamily: 'var(--font-mono)' }}>{f.latency}</td>
-                  <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{f.summary}</td>
-                </tr>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button onClick={fetchFlows} className="btn-secondary" style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}>
+              <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
+            </button>
+            <div style={{ display: 'flex', gap: '0.3rem' }}>
+              {['ALL', 'HTTP', 'TCP'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setProtocolFilter(p)}
+                  style={{
+                    background: protocolFilter === p ? 'rgba(0, 240, 255, 0.15)' : 'transparent',
+                    color: protocolFilter === p ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                    border: protocolFilter === p ? '1px solid var(--accent-cyan)' : '1px solid var(--border-glass)',
+                    borderRadius: 6,
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {p}
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
+
+        {filteredFlows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+            <Activity size={36} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4 }} />
+            <p style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 600 }}>No network flows recorded yet</p>
+            <p style={{ fontSize: '0.82rem', marginTop: '0.25rem' }}>Inbound API requests and workload network packets will automatically appear here in realtime.</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ color: 'var(--text-muted)', fontSize: '0.8rem', borderBottom: '1px solid var(--border-glass)' }}>
+                  <th style={{ padding: '0.75rem' }}>TIME</th>
+                  <th style={{ padding: '0.75rem' }}>SOURCE</th>
+                  <th style={{ padding: '0.75rem' }}>DESTINATION</th>
+                  <th style={{ padding: '0.75rem' }}>PROTO / PORT</th>
+                  <th style={{ padding: '0.75rem' }}>VERDICT</th>
+                  <th style={{ padding: '0.75rem' }}>SUMMARY</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredFlows.map((flow, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '0.88rem' }}>
+                    <td style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      {new Date(flow.timestamp).toLocaleTimeString()}
+                    </td>
+                    <td style={{ padding: '0.75rem' }}>
+                      <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{flow.srcPod || flow.srcIP}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 4 }}>({flow.srcNS})</span>
+                    </td>
+                    <td style={{ padding: '0.75rem' }}>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>{flow.dstPod || flow.dstIP}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 4 }}>({flow.dstNS})</span>
+                    </td>
+                    <td style={{ padding: '0.75rem', color: 'var(--accent-purple)' }}>{flow.protocol} / {flow.dstPort}</td>
+                    <td style={{ padding: '0.75rem' }}>
+                      <span style={{
+                        background: flow.verdict === 'FORWARDED' ? 'rgba(57, 255, 20, 0.15)' : 'rgba(255, 0, 85, 0.15)',
+                        color: flow.verdict === 'FORWARDED' ? 'var(--accent-green)' : 'var(--accent-pink)',
+                        border: `1px solid ${flow.verdict === 'FORWARDED' ? 'rgba(57, 255, 20, 0.3)' : 'rgba(255, 0, 85, 0.3)'}`,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        {flow.verdict}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      {flow.summary} ({flow.latencyMs.toFixed(1)}ms)
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

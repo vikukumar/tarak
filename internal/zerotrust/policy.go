@@ -36,28 +36,21 @@ type Manager struct {
 
 // NewManager creates a new Zero-Trust policy manager.
 func NewManager(log *zap.Logger) *Manager {
-	m := &Manager{
+	return &Manager{
 		log:      log.Named("zerotrust"),
 		policies: make(map[string]*Policy),
 	}
+}
 
-	// Default cluster-wide strict zero trust baseline
-	m.policies["default/strict-baseline"] = &Policy{
-		Name:        "strict-baseline",
-		Namespace:   "default",
-		DefaultDeny: true,
-		Rules: []ZeroTrustRule{
-			{
-				SourceIdentity: "spiffe://tarak.mesh/ns/default/sa/frontend",
-				TargetService:  "api-service",
-				AllowedMethods: []string{"GET", "POST"},
-				AllowedPaths:   []string{"/api/*"},
-				Action:         "ALLOW",
-			},
-		},
+// RegisterPolicy registers a Zero-Trust policy in the manager.
+func (m *Manager) RegisterPolicy(p *Policy) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if p.Namespace == "" {
+		p.Namespace = "default"
 	}
-
-	return m
+	key := fmt.Sprintf("%s/%s", p.Namespace, p.Name)
+	m.policies[key] = p
 }
 
 // Evaluate checks if a source identity is permitted to call the target service/method.

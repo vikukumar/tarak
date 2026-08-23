@@ -14,6 +14,23 @@ func TestZeroTrust_Evaluation(t *testing.T) {
 	log := zaptest.NewLogger(t)
 	mgr := NewManager(log)
 
+	// Register policy under test
+	policy := &Policy{
+		Name:        "test-policy",
+		Namespace:   "default",
+		DefaultDeny: true,
+		Rules: []ZeroTrustRule{
+			{
+				SourceIdentity: "spiffe://tarak.mesh/ns/default/sa/frontend",
+				TargetService:  "api-service",
+				AllowedMethods: []string{"GET", "POST"},
+				AllowedPaths:   []string{"/api/*"},
+				Action:         "ALLOW",
+			},
+		},
+	}
+	mgr.RegisterPolicy(policy)
+
 	// Test default-deny on unauthorized service
 	allowed, _ := mgr.Evaluate("spiffe://tarak.mesh/ns/default/sa/guest", "api-service", "GET", "/api/v1/users")
 	if allowed {

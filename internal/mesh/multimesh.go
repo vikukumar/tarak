@@ -59,29 +59,6 @@ func NewMultiMeshManager(log *zap.Logger) *MultiMeshManager {
 	m.passthroughPolicies["default"] = make(map[string]*MeshPassthroughPolicy)
 	m.proxyPatches["default"] = make(map[string]*MeshProxyPatch)
 
-	// Pre-seed sample service discovery in default mesh
-	m.AutoEnrollWorkload("default", "default", "frontend", 80, "http", []string{"10.244.0.12:80"})
-	m.AutoEnrollWorkload("default", "default", "api-service", 8080, "http", []string{"10.244.0.14:8080"})
-
-	// Pre-seed an external service
-	m.externalServices["default"]["stripe-api"] = &MeshExternalService{
-		Name:        "stripe-api",
-		Mesh:        "default",
-		Host:        "api.stripe.com",
-		Port:        443,
-		TLSRequired: true,
-		SNI:         "api.stripe.com",
-	}
-
-	// Pre-seed traffic permission
-	m.trafficPermissions["default"]["allow-frontend-to-api"] = &MeshTrafficPermission{
-		Name: "allow-frontend-to-api",
-		Mesh: "default",
-		From: []PermissionMatch{{Service: "frontend"}},
-		To:   []PermissionMatch{{Service: "api-service"}},
-		Action: "ALLOW",
-	}
-
 	return m
 }
 

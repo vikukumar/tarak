@@ -36,73 +36,13 @@ type Collector struct {
 	log    *zap.Logger
 }
 
-// NewCollector creates a new telemetry flow collector with pre-seeded demonstration traffic.
+// NewCollector creates a new telemetry flow collector.
 func NewCollector(log *zap.Logger) *Collector {
-	c := &Collector{
+	return &Collector{
 		flows:  make([]NetworkFlow, 0, 100),
 		maxCap: 500,
 		log:    log.Named("hubble-collector"),
 	}
-	c.seedInitialFlows()
-	return c
-}
-
-func (c *Collector) seedInitialFlows() {
-	now := time.Now()
-	sampleFlows := []NetworkFlow{
-		{
-			ID:         "flow-1",
-			Timestamp:  now.Add(-2 * time.Second),
-			SrcPod:     "frontend-ingress-7d4a",
-			SrcNS:      "default",
-			SrcIP:      "10.244.0.12",
-			DstPod:     "api-gateway-55b2",
-			DstNS:      "default",
-			DstIP:      "10.244.0.15",
-			DstPort:    8080,
-			Protocol:   "HTTP",
-			Verdict:    "FORWARDED",
-			StatusCode: 200,
-			LatencyMs:  1.4,
-			Bytes:      2048,
-			Summary:    "GET /api/v1/users (200 OK)",
-		},
-		{
-			ID:         "flow-2",
-			Timestamp:  now.Add(-1 * time.Second),
-			SrcPod:     "api-gateway-55b2",
-			SrcNS:      "default",
-			SrcIP:      "10.244.0.15",
-			DstPod:     "user-auth-service-91a",
-			DstNS:      "default",
-			DstIP:      "10.244.0.18",
-			DstPort:    50051,
-			Protocol:   "TCP",
-			Verdict:    "FORWARDED",
-			StatusCode: 200,
-			LatencyMs:  0.8,
-			Bytes:      1024,
-			Summary:    "gRPC VerifySession",
-		},
-		{
-			ID:         "flow-3",
-			Timestamp:  now.Add(-500 * time.Millisecond),
-			SrcPod:     "unknown-scanner-pod",
-			SrcNS:      "tarak-public",
-			SrcIP:      "192.168.1.105",
-			DstPod:     "db-primary-0",
-			DstNS:      "tarak-system",
-			DstIP:      "10.244.0.5",
-			DstPort:    5432,
-			Protocol:   "TCP",
-			Verdict:    "DROPPED",
-			StatusCode: 403,
-			LatencyMs:  0.1,
-			Bytes:      64,
-			Summary:    "Strict NetworkPolicy Blocked",
-		},
-	}
-	c.flows = append(c.flows, sampleFlows...)
 }
 
 // RecordFlow appends a network flow event.

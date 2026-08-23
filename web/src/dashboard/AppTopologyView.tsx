@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GitPullRequest, 
   RefreshCw, 
@@ -28,50 +28,90 @@ interface AppResource {
   info: string;
 }
 
-export const AppTopologyView: React.FC<Props> = ({ namespace, onToast }) => {
-  const [selectedApp, setSelectedApp] = useState<string>('production-storefront');
-  const [replicas, setReplicas] = useState<number>(3);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+interface AppItem {
+  id: string;
+  name: string;
+  repo: string;
+  targetRev: string;
+  syncStatus: string;
+  healthStatus: string;
+  ingressHost?: string;
+  resources: AppResource[];
+}
 
-  const apps = [
-    {
-      id: 'production-storefront',
-      name: 'production-storefront',
-      repo: 'https://github.com/vikukumar/tarak-sample-app',
-      targetRev: 'main (a4f91e)',
-      syncStatus: 'Synced',
-      healthStatus: 'Healthy',
-      ingressHost: 'store.vikshro.in',
-      resources: [
-        { kind: 'Application', name: 'production-storefront', status: 'Healthy', info: 'Git Revision: a4f91e' },
-        { kind: 'Deployment', name: 'storefront-web', status: 'Healthy', info: `Desired: ${replicas} / Ready: ${replicas}` },
-        { kind: 'ReplicaSet', name: 'storefront-web-6d9b7c', status: 'Healthy', info: `${replicas} Pods Active` },
-        { kind: 'Pod', name: 'storefront-web-6d9b7c-7d2x1', status: 'Healthy', info: '10.244.0.12 (Node: worker-01)' },
-        { kind: 'Pod', name: 'storefront-web-6d9b7c-8m4k9', status: 'Healthy', info: '10.244.0.14 (Node: worker-02)' },
-        { kind: 'Pod', name: 'storefront-web-6d9b7c-1p0z3', status: 'Healthy', info: '10.244.0.19 (Node: worker-01)' },
-        { kind: 'Service', name: 'storefront-svc', status: 'Healthy', info: 'ClusterIP: 10.96.12.8:80' },
-        { kind: 'Ingress', name: 'storefront-cf-ingress', status: 'Healthy', info: 'https://store.vikshro.in (Cloudflare Tunnel)' }
-      ]
-    },
-    {
-      id: 'user-auth-api',
-      name: 'user-auth-api',
-      repo: 'https://github.com/vikukumar/tarak-auth-service',
-      targetRev: 'v2.1.0',
-      syncStatus: 'Synced',
-      healthStatus: 'Healthy',
-      ingressHost: 'auth.vikshro.in',
-      resources: [
-        { kind: 'Application', name: 'user-auth-api', status: 'Healthy', info: 'Git Revision: v2.1.0' },
-        { kind: 'Deployment', name: 'auth-service', status: 'Healthy', info: 'Desired: 2 / Ready: 2' },
-        { kind: 'ReplicaSet', name: 'auth-service-58f79', status: 'Healthy', info: '2 Pods Active' },
-        { kind: 'Pod', name: 'auth-service-58f79-22a1', status: 'Healthy', info: '10.244.0.21 (Node: worker-01)' },
-        { kind: 'Pod', name: 'auth-service-58f79-99b4', status: 'Healthy', info: '10.244.0.22 (Node: worker-02)' },
-        { kind: 'Service', name: 'auth-svc', status: 'Healthy', info: 'ClusterIP: 10.96.44.19:50051' },
-        { kind: 'Ingress', name: 'auth-tailscale-ingress', status: 'Healthy', info: 'https://auth.ts.net (Tailscale Mesh)' }
-      ]
+export const AppTopologyView: React.FC<Props> = ({ namespace, onToast }) => {
+  const [apps, setApps] = useState<AppItem[]>([]);
+  const [selectedApp, setSelectedApp] = useState<string>('');
+  const [replicas, setReplicas] = useState<number>(2);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lbStatus, setLbStatus] = useState<any>(null);
+
+  const fetchAppsAndTopology = async () => {
+    try {
+      // 1. Fetch Deployments & Pods to build real topology
+      const depsRes = await fetch(`/apis/apps/v1/namespaces/${namespace}/deployments`);
+      const podsRes = await fetch(`/api/v1/namespaces/${namespace}/pods`);
+      const lbRes = await fetch(`/apis/networking.tarak.io/v1/loadbalancer/status`);
+
+      if (lbRes.ok) {
+        const lbData = await lbRes.json();
+        setLbStatus(lbData);
+      }
+
+      const builtApps: AppItem[] = [];
+
+      if (depsRes.ok && podsRes.ok) {
+        const deps = await depsRes.json();
+        const pods = await podsRes.json();
+
+        const depItems = deps.items || [];
+        const podItems = pods.items || [];
+
+        for (const dep of depItems) {
+          const dName = dep.metadata?.name || 'app';
+          const rList: AppResource[] = [
+            { kind: 'Application', name: dName, status: 'Synced', info: 'GitOps Continuous Sync Active' },
+            { kind: 'Deployment', name: dName, status: 'Healthy', info: `Desired: ${dep.spec?.replicas || 1} / Ready: ${dep.spec?.replicas || 1}` },
+          ];
+
+          // Associate pods
+          for (const pod of podItems) {
+            const pName = pod.metadata?.name || 'pod';
+            if (pName.startsWith(dName) || depItems.length === 1) {
+              rList.push({
+                kind: 'Pod',
+                name: pName,
+                status: 'Healthy',
+                info: `${pod.status?.podIP || '10.244.0.12'} (${pod.spec?.nodeName || 'local-node'})`
+              });
+            }
+          }
+
+          builtApps.push({
+            id: dName,
+            name: dName,
+            repo: 'https://github.com/vikukumar/tarak',
+            targetRev: 'main (live)',
+            syncStatus: 'Synced',
+            healthStatus: 'Healthy',
+            ingressHost: `${dName}.vikshro.in`,
+            resources: rList
+          });
+        }
+      }
+
+      setApps(builtApps);
+      if (builtApps.length > 0 && (!selectedApp || !builtApps.some(a => a.id === selectedApp))) {
+        setSelectedApp(builtApps[0].id);
+      }
+    } catch {
+      // Fallback
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchAppsAndTopology();
+  }, [namespace]);
 
   const currentApp = apps.find(a => a.id === selectedApp) || apps[0];
 
@@ -79,154 +119,131 @@ export const AppTopologyView: React.FC<Props> = ({ namespace, onToast }) => {
     setIsSyncing(true);
     setTimeout(() => {
       setIsSyncing(false);
-      onToast(`Application ${currentApp.name} synced with Git repository!`);
+      onToast(`Application '${selectedApp}' synced from Git repository!`);
     }, 800);
   };
 
-  const handleRestart = () => {
-    onToast(`Initiated rolling restart for ${currentApp.name}`);
-  };
-
-  const handleScale = (delta: number) => {
-    const next = Math.max(1, replicas + delta);
-    setReplicas(next);
-    onToast(`Scaled deployment ${currentApp.name} to ${next} replicas`);
-  };
-
-  const getStatusBadge = (s: string) => {
-    switch (s) {
-      case 'Healthy':
-      case 'Synced':
-        return <span className="badge badge-emerald"><CheckCircle2 size={12} /> {s}</span>;
-      case 'Progressing':
-        return <span className="badge badge-cyan"><Clock size={12} /> {s}</span>;
-      default:
-        return <span className="badge badge-purple"><AlertCircle size={12} /> {s}</span>;
-    }
+  const handleScale = (newScale: number) => {
+    setReplicas(newScale);
+    onToast(`Scaled deployment '${selectedApp}' to ${newScale} replicas`);
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* App Header & GitOps Sync Controls */}
-      <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
-            <GitPullRequest size={22} color="var(--accent-cyan)" />
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>{currentApp.name}</h2>
-            {getStatusBadge(currentApp.healthStatus)}
-            {getStatusBadge(currentApp.syncStatus)}
+      {/* Top Controls: App Selector & Actions */}
+      <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <GitPullRequest size={20} color="var(--accent-cyan)" />
+            <span style={{ fontWeight: 700, color: '#fff', fontSize: '1rem' }}>GitOps App:</span>
+            {apps.length === 0 ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No workloads in namespace '{namespace}'</span>
+            ) : (
+              <select 
+                value={selectedApp} 
+                onChange={e => setSelectedApp(e.target.value)}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid var(--accent-cyan)',
+                  color: '#fff',
+                  padding: '0.4rem 0.85rem',
+                  borderRadius: 6,
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {apps.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <span>Repo: <b>{currentApp.repo}</b></span>
-            <span>Revision: <code style={{ color: 'var(--accent-cyan)' }}>{currentApp.targetRev}</code></span>
-          </div>
+
+          <button onClick={fetchAppsAndTopology} className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+            <RefreshCw size={13} />
+          </button>
         </div>
 
-        {/* Action Buttons (ArgoCD Toolbar) */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={handleSync} className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-            <RefreshCw size={14} className={isSyncing ? 'spin-icon' : ''} />
-            <span>{isSyncing ? 'Syncing...' : 'Sync Git'}</span>
-          </button>
-          <button onClick={handleRestart} className="btn-secondary" style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
-            <RotateCcw size={14} />
-            <span>Restart</span>
-          </button>
-          <button onClick={() => handleScale(1)} className="btn-secondary" style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
-            <Sliders size={14} />
-            <span>Scale (+1)</span>
-          </button>
+        {currentApp && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button onClick={handleSync} disabled={isSyncing} className="btn-primary" style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}>
+              <RefreshCw size={14} className={isSyncing ? 'spin' : ''} /> {isSyncing ? 'Syncing...' : 'Sync (ArgoCD)'}
+            </button>
+            <button onClick={() => onToast('Rollback initiated')} className="btn-secondary" style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
+              <RotateCcw size={14} /> Rollback
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Network Infrastructure & Load Balancer Status Card */}
+      <div className="glass-card" style={{ padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Globe size={18} color="var(--accent-cyan)" />
+              <h4 style={{ color: '#fff', fontSize: '1rem' }}>Bare-Metal Auto-Detect Load Balancer</h4>
+              <span style={{ background: 'rgba(57, 255, 20, 0.15)', color: 'var(--accent-green)', padding: '2px 8px', borderRadius: 4, fontSize: '0.72rem', fontWeight: 700 }}>
+                ACTIVE (WAN / LAN AUTO-DISCOVERY)
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
+              Auto-detects external public WAN IP & local subnet to bind any Ingress class with zero third-party tools.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <div>Public WAN IP: <code style={{ color: 'var(--accent-pink)', fontWeight: 700 }}>{lbStatus?.publicIP || 'Auto-Detected'}</code></div>
+            <div>Local Subnet VIP: <code style={{ color: 'var(--accent-green)', fontWeight: 700 }}>{lbStatus?.lanIP || '127.0.0.1'}</code></div>
+          </div>
         </div>
       </div>
 
-      {/* Visual Dependency Graph (ArgoCD Tree Flow) */}
-      <div className="glass-card" style={{ padding: '2rem' }}>
-        <h3 style={{ color: '#fff', fontSize: '1.15rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Network size={18} color="var(--accent-cyan)" />
-          <span>Application Resource Tree (ArgoCD Visual Topology)</span>
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+      {/* Topology Graph & Resources */}
+      {currentApp ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
           {currentApp.resources.map((res, idx) => (
             <div key={idx} style={{
-              background: 'rgba(15, 23, 42, 0.7)',
+              background: 'rgba(10, 15, 30, 0.6)',
               border: '1px solid var(--border-glass)',
-              borderRadius: 12,
-              padding: '1.25rem',
-              position: 'relative',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+              borderRadius: 8,
+              padding: '1.25rem'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {res.kind === 'Application' && <GitPullRequest size={16} color="var(--accent-cyan)" />}
+                  {res.kind === 'Deployment' && <Sliders size={16} color="var(--accent-purple)" />}
+                  {res.kind === 'Pod' && <Box size={16} color="var(--accent-green)" />}
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>{res.kind}</span>
+                </div>
                 <span style={{
-                  background: 'rgba(0, 240, 255, 0.1)',
-                  color: 'var(--accent-cyan)',
-                  border: '1px solid rgba(0, 240, 255, 0.3)',
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  fontSize: '0.75rem',
+                  background: 'rgba(57, 255, 20, 0.15)',
+                  color: 'var(--accent-green)',
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  fontSize: '0.72rem',
                   fontWeight: 700
                 }}>
-                  {res.kind}
+                  {res.status}
                 </span>
-                {getStatusBadge(res.status)}
               </div>
-
-              <h4 style={{ color: '#fff', fontSize: '0.98rem', marginBottom: '0.4rem', wordBreak: 'break-all' }}>{res.name}</h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontFamily: 'var(--font-mono)' }}>{res.info}</p>
+              <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.3rem' }}>
+                {res.name}
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                {res.info}
+              </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Inbuilt Service Mesh & Bare-Metal Load Balancer Controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-        {/* Service Mesh Canary Splitter */}
-        <div className="glass-card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Sliders size={18} color="var(--accent-purple)" /> Inbuilt Service Mesh (Canary Splitter)
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Kong/Kuma-style traffic splitting without third-party tools.
-          </p>
-          <div style={{ background: 'rgba(10, 15, 30, 0.6)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-glass)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              <span style={{ color: 'var(--accent-cyan)' }}>v1 (Stable): 90%</span>
-              <span style={{ color: 'var(--accent-pink)' }}>v2 (Canary): 10%</span>
-            </div>
-            <div style={{ height: 8, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
-              <div style={{ width: '90%', background: 'var(--accent-cyan)' }}></div>
-              <div style={{ width: '10%', background: 'var(--accent-pink)' }}></div>
-            </div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              SPIFFE mTLS: <code style={{ color: 'var(--accent-green)' }}>spiffe://tarak.mesh/ns/default/sa/{currentApp.name}</code>
-            </div>
-          </div>
+      ) : (
+        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <GitPullRequest size={42} style={{ margin: '0 auto 1rem auto', opacity: 0.4 }} />
+          <h3 style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '0.5rem' }}>No Active Workloads in Namespace '{namespace}'</h3>
+          <p style={{ fontSize: '0.85rem' }}>Deploy an application in the Workloads tab or run <code>tarakctl run</code> to visualize live GitOps topology.</p>
         </div>
-
-        {/* Bare-Metal Load Balancer Status */}
-        <div className="glass-card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Globe size={18} color="var(--accent-green)" /> Bare-Metal Load Balancer (Auto-VIP)
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Automatic public WAN detection and multi-IngressClass support.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Auto-Detected Public IP:</span>
-              <code style={{ color: 'var(--accent-cyan)' }}>103.212.148.92 (WAN)</code>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Allocated VIP Pool:</span>
-              <code style={{ color: 'var(--accent-green)' }}>192.168.1.200/28</code>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Supported Classes:</span>
-              <span style={{ color: '#fff' }}>tarak, nginx, traefik, kong, kuma</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
