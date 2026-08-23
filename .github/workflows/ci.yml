@@ -33,6 +33,7 @@ jobs:
           npm ci || npm install
           npm run build
           cd ..
+          mkdir -p internal/ui/dist
           rm -rf internal/ui/dist/*
           cp -r dashboard/out/* internal/ui/dist/
 

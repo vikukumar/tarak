@@ -61,6 +61,7 @@ jobs:
           npm ci || npm install
           npm run build
           cd ..
+          mkdir -p internal/ui/dist
           rm -rf internal/ui/dist/*
           cp -r dashboard/out/* internal/ui/dist/
           echo "Embedded Next.js UI successfully prepared in internal/ui/dist/"
@@ -77,19 +78,20 @@ jobs:
         run: |
           set -e
 
-          # Fetch all tags
-          git fetch --tags --force || true
+          # Fetch all tags from remote
+          git fetch --tags --force origin || true
 
-          # Read current version from internal/version/version.go or latest git tag
-          CURRENT_FILE_VER=$(grep -E 'Version\s*=\s*"[^"]+"' internal/version/version.go | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.0.0")
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v$CURRENT_FILE_VER")
-          CLEAN_TAG=${LATEST_TAG#v}
+          # Find highest existing semver tag in the repository
+          LATEST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sed 's/^v//' | sort -V | tail -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            CURRENT_FILE_VER=$(grep -E 'Version\s*=\s*"[^"]+"' internal/version/version.go | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.0.6")
+            LATEST_TAG="$CURRENT_FILE_VER"
+          fi
 
-          echo "Latest tag found: $LATEST_TAG (clean: $CLEAN_TAG)"
-          echo "File version: $CURRENT_FILE_VER"
+          echo "Highest repository tag: v$LATEST_TAG"
 
           # Parse Major.Minor.Patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CLEAN_TAG"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_TAG"
           MAJOR=${MAJOR:-1}
           MINOR=${MINOR:-0}
           PATCH=${PATCH:-0}
@@ -117,9 +119,9 @@ jobs:
             NEW_VER="$MAJOR.$MINOR.$PATCH"
             BUMP_REASON="Manual patch bump"
           else
-            # Automated detection based on git commit history since last tag
-            COMMITS_LOG=$(git log "$LATEST_TAG"..HEAD --oneline 2>/dev/null || git log -n 10 --oneline)
-            echo "Commits since last tag:"
+            # Automated detection based on git commit history
+            COMMITS_LOG=$(git log -n 25 --oneline 2>/dev/null || echo "")
+            echo "Recent commits:"
             echo "$COMMITS_LOG"
 
             if echo "$COMMITS_LOG" | grep -Ei 'BREAKING CHANGE:|breaking:|^major:|\(major\):|\[major\]'; then
@@ -140,6 +142,13 @@ jobs:
             fi
           fi
 
+          # Ensure the calculated tag is strictly unique by checking existing tags
+          while git rev-parse "v$NEW_VER" >/dev/null 2>&1 || git tag -l "v$NEW_VER" | grep -q "v$NEW_VER"; do
+            echo "Tag v$NEW_VER already exists in repository, auto-incrementing patch..."
+            PATCH=$((PATCH + 1))
+            NEW_VER="$MAJOR.$MINOR.$PATCH"
+          done
+
           NEW_TAG="v$NEW_VER"
           echo "Computed new version: $NEW_VER ($NEW_TAG) - Reason: $BUMP_REASON"
 
@@ -154,18 +163,18 @@ jobs:
           echo "Updated internal/version/version.go:"
           cat internal/version/version.go
 
-          # Configure Git and commit version bump if changed
+          # Configure Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if ! git diff --quiet internal/version/version.go; then
             git add internal/version/version.go
-            git commit -m "chore(release): bump version to $NEW_TAG [skip ci]"
-            git push origin HEAD:${{ github.ref_name }} || echo "Push skipped or branch protected"
+            git commit -m "chore(release): bump version to $NEW_TAG [skip ci]" || true
+            git push origin HEAD:${{ github.ref_name }} || echo "Direct branch push skipped or protected by rules"
           fi
 
-          # Tag the release
-          git tag -a "$NEW_TAG" -m "Release $NEW_TAG - $BUMP_REASON"
+          # Force create and push the release tag
+          git tag -fa "$NEW_TAG" -m "Release $NEW_TAG - $BUMP_REASON"
           git push origin "$NEW_TAG" --force || true
 
           # Set outputs
