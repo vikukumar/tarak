@@ -53,6 +53,8 @@ import (
 	"github.com/vikukumar/tarak/internal/auth"
 	"github.com/vikukumar/tarak/internal/controller"
 	"github.com/vikukumar/tarak/internal/ingress"
+	"github.com/vikukumar/tarak/internal/loadbalancer"
+	"github.com/vikukumar/tarak/internal/mesh"
 	"github.com/vikukumar/tarak/internal/rbac"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
@@ -60,6 +62,7 @@ import (
 	"github.com/vikukumar/tarak/internal/tunnel"
 	"github.com/vikukumar/tarak/internal/ui"
 	"github.com/vikukumar/tarak/internal/version"
+	"github.com/vikukumar/tarak/internal/zerotrust"
 	"github.com/vikukumar/tarak/pkg/api/handler"
 	"github.com/vikukumar/tarak/pkg/api/middleware"
 	tarakwatch "github.com/vikukumar/tarak/pkg/api/watch"
@@ -120,12 +123,12 @@ type Config struct {
 
 // Server is a running Tarak API server instance.
 type Server struct {
-	cfg           Config
-	store         statestore.Store
-	runtime       tarakruntime.Runtime
-	health        *health.Handler
-	metrics       *metrics.Registry
-	log           *zap.Logger
+	cfg             Config
+	store           statestore.Store
+	runtime         tarakruntime.Runtime
+	health          *health.Handler
+	metrics         *metrics.Registry
+	log             *zap.Logger
 	httpSrv         *http.Server
 	ingressRouter   *ingress.Router
 	ingressCtrl     *ingress.Controller
@@ -134,6 +137,9 @@ type Server struct {
 	ssoManager      *auth.Manager
 	rbacAuthorizer  *rbac.Authorizer
 	hubbleCollector *telemetry.Collector
+	lbCtrl          *loadbalancer.Controller
+	meshEngine      *mesh.Engine
+	zeroTrustMgr    *zerotrust.Manager
 }
 
 // New creates a new Server from the given configuration.
@@ -164,6 +170,9 @@ func New(cfg Config) (*Server, error) {
 	ssoMgr := auth.NewManager(nil, cfg.Log)
 	rbacAuth := rbac.NewAuthorizer(store, cfg.Log)
 	hubbleColl := telemetry.NewCollector(cfg.Log)
+	lbCtrl := loadbalancer.NewController(cfg.Log)
+	meshEngine := mesh.NewEngine(cfg.Log)
+	zeroTrustMgr := zerotrust.NewManager(cfg.Log)
 
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
@@ -177,10 +186,13 @@ func New(cfg Config) (*Server, error) {
 		runtime:         rt,
 		health:          h,
 		metrics:         m,
+		log:             cfg.Log.Named("apiserver"),
 		ssoManager:      ssoMgr,
 		rbacAuthorizer:  rbacAuth,
 		hubbleCollector: hubbleColl,
-		log:             cfg.Log,
+		lbCtrl:          lbCtrl,
+		meshEngine:      meshEngine,
+		zeroTrustMgr:    zeroTrustMgr,
 	}
 	return s, nil
 }
@@ -346,6 +358,24 @@ func (s *Server) Run(ctx context.Context) error {
 	r.Get("/apis/runtime.tarak.io/v1/version", s.serveRuntimeVersion)
 	r.Get("/apis/runtime.tarak.io/v1/status", s.serveRuntimeStatus)
 
+	// ── Bare-Metal Load Balancer API ──────────────────────────────────────
+	r.Get("/apis/networking.tarak.io/v1/loadbalancer/status", s.lbCtrl.HandleStatus)
+
+	// ── Inbuilt Service Mesh API ──────────────────────────────────────────
+	r.Route("/apis/mesh.tarak.io/v1", func(r chi.Router) {
+		r.Get("/routes", s.meshEngine.HandleListRoutes)
+		r.Post("/routes", s.meshEngine.HandleCreateRoute)
+		r.Delete("/namespaces/{namespace}/routes/{name}", s.meshEngine.HandleDeleteRoute)
+	})
+
+	// ── Native Zero-Trust Security API ────────────────────────────────────
+	r.Route("/apis/security.tarak.io/v1/zerotrust", func(r chi.Router) {
+		r.Get("/policies", s.zeroTrustMgr.HandleListPolicies)
+		r.Post("/policies", s.zeroTrustMgr.HandleCreatePolicy)
+		r.Post("/evaluate", s.zeroTrustMgr.HandleEvaluate)
+		r.Delete("/namespaces/{namespace}/policies/{name}", s.zeroTrustMgr.HandleDeletePolicy)
+	})
+
 	// ── Inbuilt Cluster Dashboard SPA Handlers ────────────────────────────
 	r.Handle("/dashboard", ui.Handler())
 	r.Handle("/dashboard/*", ui.Handler())
@@ -387,6 +417,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}, s.ingressRouter, s.log)
 
 	_ = s.bootstrapIngressClasses(ctx)
+	s.lbCtrl.Start(ctx)
 
 	if s.cfg.CloudflareTunnel {
 		_ = s.cfManager.Start(ctx, s.cfg.IngressHTTPAddress)

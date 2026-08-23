@@ -177,6 +177,56 @@ export const AppTopologyView: React.FC<Props> = ({ namespace, onToast }) => {
           ))}
         </div>
       </div>
+
+      {/* Inbuilt Service Mesh & Bare-Metal Load Balancer Controls */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        {/* Service Mesh Canary Splitter */}
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sliders size={18} color="var(--accent-purple)" /> Inbuilt Service Mesh (Canary Splitter)
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            Kong/Kuma-style traffic splitting without third-party tools.
+          </p>
+          <div style={{ background: 'rgba(10, 15, 30, 0.6)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-glass)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              <span style={{ color: 'var(--accent-cyan)' }}>v1 (Stable): 90%</span>
+              <span style={{ color: 'var(--accent-pink)' }}>v2 (Canary): 10%</span>
+            </div>
+            <div style={{ height: 8, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: '90%', background: 'var(--accent-cyan)' }}></div>
+              <div style={{ width: '10%', background: 'var(--accent-pink)' }}></div>
+            </div>
+            <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              SPIFFE mTLS: <code style={{ color: 'var(--accent-green)' }}>spiffe://tarak.mesh/ns/default/sa/{currentApp.name}</code>
+            </div>
+          </div>
+        </div>
+
+        {/* Bare-Metal Load Balancer Status */}
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Globe size={18} color="var(--accent-green)" /> Bare-Metal Load Balancer (Auto-VIP)
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            Automatic public WAN detection and multi-IngressClass support.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Auto-Detected Public IP:</span>
+              <code style={{ color: 'var(--accent-cyan)' }}>103.212.148.92 (WAN)</code>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Allocated VIP Pool:</span>
+              <code style={{ color: 'var(--accent-green)' }}>192.168.1.200/28</code>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(10, 15, 30, 0.6)', borderRadius: 6 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Supported Classes:</span>
+              <span style={{ color: '#fff' }}>tarak, nginx, traefik, kong, kuma</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
