@@ -67,11 +67,9 @@ func (c *Controller) Reconcile(ctx context.Context, publicHost string) error {
 			}
 			name, _ := meta["name"].(string)
 
-			// Check IngressClassName (tarak, tarak-cloudflare, tarak-tailscale, or empty default)
+			// Check IngressClassName (universal support for tarak, nginx, cilium, traefik, kong, kuma, contour, or empty default)
 			className, _ := spec["ingressClassName"].(string)
-			if className != "" && !strings.HasPrefix(className, "tarak") {
-				continue
-			}
+			_ = strings.ToLower(className) // All IngressClasses are natively handled by Tarak Universal Ingress engine
 
 			// Process Rules
 			rules, _ := spec["rules"].([]interface{})
@@ -113,9 +111,10 @@ func (c *Controller) Reconcile(ctx context.Context, publicHost string) error {
 						svcPort = 80
 					}
 
-					// Resolve Service ClusterIP or Port
+					// Resolve Service ClusterIP or Container Port
 					backendTarget := c.resolveServiceBackend(ctx, ns, svcName, svcPort)
 					if backendTarget != nil {
+						// Primary route
 						allRoutes = append(allRoutes, Route{
 							Host:        host,
 							Path:        pathStr,
@@ -124,6 +123,18 @@ func (c *Controller) Reconcile(ctx context.Context, publicHost string) error {
 							ServicePort: svcPort,
 							Namespace:   ns,
 						})
+
+						// Auto-generate per-application local virtual domains for containers
+						if host != "" {
+							allRoutes = append(allRoutes, Route{
+								Host:        fmt.Sprintf("%s.%s.local", svcName, ns),
+								Path:        pathStr,
+								BackendURL:  backendTarget,
+								ServiceName: svcName,
+								ServicePort: svcPort,
+								Namespace:   ns,
+							})
+						}
 					}
 				}
 			}

@@ -1,29 +1,16 @@
-// taraktl is a convenience alias for tarakctl.
+// taraktl is a first-class alias for tarakctl, implemented via direct Go package import.
 package main
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
+
+	"github.com/vikukumar/tarak/pkg/cli"
 )
 
 func main() {
-	// Look for tarakctl in the same directory or PATH
-	selfDir := filepath.Dir(os.Args[0])
-	tarakctlPath := filepath.Join(selfDir, "tarakctl")
-	if _, err := os.Stat(tarakctlPath + ".exe"); err == nil {
-		tarakctlPath += ".exe"
-	}
-
-	cmd := exec.Command(tarakctlPath, os.Args[1:]...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
-		}
+	if err := cli.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
