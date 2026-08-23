@@ -1,0 +1,207 @@
+[
+  {
+    "version": "1.0.6",
+    "tag": "v1.0.6",
+    "date": "2026-08-23",
+    "isLatest": true,
+    "status": "Production Ready",
+    "name": "Tarak v1.0.6 — Real Multi-Container Engine, Hardware Telemetry & Mesh Suite",
+    "highlights": [
+      "Real Multi-Container Pods & Init Container execution with process isolation and dedicated logging",
+      "Native OCI layer extraction & direct binary execution (Docker, Podman, Windows HCS, or TCR Native sandbox)",
+      "Real hardware telemetry sampling: physical RAM and CPU utilization from kernel (GlobalMemoryStatusEx, GetSystemTimes, /proc/stat)",
+      "Interactive Web Terminal & Live Container Logs with multi-container selection and WebSocket streaming",
+      "Full Service Mesh Suite: Tenant management, mTLS Traffic Permissions, Egress Passthrough, and Canary Traffic Routes",
+      "CustomResourceDefinition (CRD) Explorer and Built-in API Resources Catalog in dashboard UI",
+      "Multi-platform production binaries compiled for Windows, Linux, and macOS (AMD64 & ARM64)"
+    ],
+    "binaries": [
+      "tarak (Unified All-in-One Engine)",
+      "tarakctl / taraktl (Kubernetes-Compatible CLI)",
+      "tarakd (Dedicated Control Plane API Server)",
+      "taraks (Dedicated Worker Node Daemon)"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.6"
+  },
+  {
+    "version": "1.0.5",
+    "tag": "v1.0.5",
+    "date": "2026-08-22",
+    "isLatest": false,
+    "status": "Stable",
+    "name": "Tarak v1.0.5 — Zero-Trust Security Policies & Ingress Gateways",
+    "highlights": [
+      "TarakSecurityPolicy (TSP) custom resource definition with mTLS strict enforcement",
+      "Cloudflare Tunnels and Tailscale private mesh automatic dynamic provisioning",
+      "MetalLB layer-2 virtual IP address pool announcer for bare-metal LoadBalancers",
+      "Next.js 16 dashboard UI with 39+ management views and responsive glassmorphism"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl",
+      "tarakd",
+      "taraks"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.5"
+  },
+  {
+    "version": "1.0.4",
+    "tag": "v1.0.4",
+    "date": "2026-08-21",
+    "isLatest": false,
+    "status": "Stable",
+    "name": "Tarak v1.0.4 — StatefulSets, DaemonSets & Persistent Storage Primitives",
+    "highlights": [
+      "Added StatefulSets controller with ordinal pod lifecycle management",
+      "Added DaemonSets controller for node-level agents and log collectors",
+      "PersistentVolume (PV) and PersistentVolumeClaim (PVC) local directory & hostpath storage provider",
+      "RBAC authorization matrix with ClusterRoles, RoleBindings, and ServiceAccount PKI"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl",
+      "tarakd",
+      "taraks"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.4"
+  },
+  {
+    "version": "1.0.3",
+    "tag": "v1.0.3",
+    "date": "2026-08-20",
+    "isLatest": false,
+    "status": "Stable",
+    "name": "Tarak v1.0.3 — Automated Network Routing & Ingress Controller",
+    "highlights": [
+      "Built-in HTTP/HTTPS Ingress Controller with automatic TLS SNI routing",
+      "NetworkPolicy enforcement with CIDR and pod selector ingress/egress rules",
+      "ConfigMap and Secret injection via environment variables and volume mounts",
+      "Diagnostic Event recorder for pod lifecycles, healthchecks, and node heartbeats"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl",
+      "tarakd",
+      "taraks"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.3"
+  },
+  {
+    "version": "1.0.2",
+    "tag": "v1.0.2",
+    "date": "2026-08-20",
+    "isLatest": false,
+    "status": "Stable",
+    "name": "Tarak v1.0.2 — Multi-Node Clustering Primitives & Worker Join Tokens",
+    "highlights": [
+      "Added worker node discovery and join mechanism with secure cluster join tokens",
+      "Heartbeat liveness monitoring and automatic workload rescheduling on node failure",
+      "Batch workloads: Kubernetes-compatible Job and CronJob controllers",
+      "Client SDK for Go (pkg/client) with REST API helpers"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl",
+      "tarakd",
+      "taraks"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.2"
+  },
+  {
+    "version": "1.0.1",
+    "tag": "v1.0.1",
+    "date": "2026-08-20",
+    "isLatest": false,
+    "status": "Stable",
+    "name": "Tarak v1.0.1 — Multi-Node Clustering & Public Go SDK",
+    "highlights": [
+      "Added multi-node clustering: separate Control Plane (tarakd) and Worker Node (taraks) daemons",
+      "Released public Go client SDK (pkg/client) and runtime primitives (pkg/tcr)",
+      "Published complete documentation portal with live changelog at tarak.vikshro.in",
+      "Native OCI layer extraction and zero-WSL container isolation on Windows, Linux, and macOS"
+    ],
+    "binaries": [
+      "tarak (Unified All-in-One)",
+      "tarakctl / taraktl (Kubernetes CLI)",
+      "tarakd (Control Plane API Server)",
+      "taraks (Worker Node Daemon)"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.1"
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "date": "2026-08-19",
+    "isLatest": false,
+    "status": "Initial Release",
+    "name": "Tarak v1.0.0 — Initial Production Release",
+    "highlights": [
+      "Built-from-scratch zero-dependency container orchestration engine",
+      "Kubernetes API compliance with standard Core v1 and Apps v1 resources",
+      "Sub-25 MB idle RAM footprint and sub-180ms instant cold-start time",
+      "Integrated Virtual Pod Bridge networking with ClusterIP and MetalLB support",
+      "Mutual TLS (mTLS) authentication with built-in P-256 ECDSA Certificate Authority"
+    ],
+    "binaries": [
+      "tarak",
+      "tarakctl"
+    ],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64",
+      "windows/arm64",
+      "darwin/amd64",
+      "darwin/arm64"
+    ],
+    "downloadUrl": "https://github.com/vikukumar/tarak/releases/tag/v1.0.0"
+  }
+]
