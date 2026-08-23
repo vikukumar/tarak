@@ -32,6 +32,10 @@ import {
   FolderGit2,
   Sliders,
   ShieldCheck,
+  Package,
+  Clock,
+  TrendingUp,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +59,7 @@ export const navigationConfig: NavItem[] = [
     badge: "GitOps",
     children: [
       { title: "Applications (ArgoCD)", href: "/dashboard/cd", icon: Box, badge: "Live" },
+      { title: "Helm Releases", href: "/dashboard/cd/helm", icon: Package, badge: "Helm 3" },
       { title: "Git Repositories", href: "/dashboard/cd/repositories", icon: FolderGit2 },
     ],
   },
@@ -66,7 +71,10 @@ export const navigationConfig: NavItem[] = [
       { title: "Deployments", href: "/dashboard/workloads/deployments", icon: Workflow },
       { title: "StatefulSets", href: "/dashboard/workloads/statefulsets", icon: Database },
       { title: "DaemonSets", href: "/dashboard/workloads/daemonsets", icon: Layers, badge: "Daemon" },
-      { title: "Jobs & CronJobs", href: "/dashboard/workloads/jobs", icon: Zap },
+      { title: "CronJobs", href: "/dashboard/workloads/cronjobs", icon: Clock },
+      { title: "Jobs", href: "/dashboard/workloads/jobs", icon: Zap },
+      { title: "Autoscaling (HPA)", href: "/dashboard/workloads/hpa", icon: TrendingUp, badge: "Auto" },
+      { title: "Disruption Budgets (PDB)", href: "/dashboard/workloads/pdb", icon: ShieldAlert },
     ],
   },
   {
@@ -138,8 +146,9 @@ export const navigationConfig: NavItem[] = [
     icon: Settings,
     children: [
       { title: "Personal Access Tokens", href: "/dashboard/settings/pat", icon: Key },
-      { title: "Profile & Avatar", href: "/dashboard/settings/profile", icon: Settings },
-      { title: "Auto-Updater", href: "/dashboard/settings/updates", icon: RefreshCw },
+      { title: "Webhook Subscriptions", href: "/dashboard/settings/webhooks", icon: Zap, badge: "Alerts" },
+      { title: "User Profile", href: "/dashboard/settings/profile", icon: Settings },
+      { title: "Updates & Releases", href: "/dashboard/settings/updates", icon: RefreshCw },
     ],
   },
 ];

@@ -112,13 +112,30 @@ export default function ServicesPage() {
     },
     {
       key: "ports",
-      header: "Port(s)",
+      header: "Port(s) & App Protocol",
       render: (svc) => {
         const ports = svc.spec?.ports || [];
+        if (ports.length === 0) return <span className="text-slate-500 font-mono text-xs">-</span>;
         return (
-          <span className="font-mono text-xs text-cyan-300">
-            {ports.map((p: any) => `${p.port}/${p.protocol || "TCP"}`).join(", ") || "-"}
-          </span>
+          <div className="flex flex-wrap gap-1 font-mono text-xs">
+            {ports.map((p: any, idx: number) => {
+              const proto = p.protocol || "TCP";
+              const appProto = p.appProtocol || proto.toLowerCase();
+              return (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 rounded bg-slate-950 border border-white/10 text-cyan-300 flex items-center gap-1 text-[11px]"
+                  title={`L4: ${proto}, Application Protocol: ${appProto}`}
+                >
+                  <span className="font-bold text-white">{p.port}</span>
+                  <span className="text-slate-400">/{proto}</span>
+                  <span className="px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] uppercase font-bold">
+                    {appProto}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
         );
       },
     },

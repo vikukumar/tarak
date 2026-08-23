@@ -66,6 +66,7 @@ import (
 	"github.com/vikukumar/tarak/internal/tunnel"
 	"github.com/vikukumar/tarak/internal/ui"
 	"github.com/vikukumar/tarak/internal/version"
+	"github.com/vikukumar/tarak/internal/webhook"
 	"github.com/vikukumar/tarak/internal/ws"
 	"github.com/vikukumar/tarak/internal/zerotrust"
 	"github.com/vikukumar/tarak/pkg/api/handler"
@@ -160,6 +161,8 @@ type Server struct {
 	cni             *network.InbuiltCNI
 	policyEngine    *policy.Engine
 	gitopsEngine    *gitops.Engine
+	webhookMgr      *webhook.Manager
+	proxyPatchMgr   *mesh.ProxyPatchManager
 	hostInfo        hardware.HostInfo
 	alloc           hardware.ResourceAllocation
 }
@@ -207,6 +210,8 @@ func New(cfg Config) (*Server, error) {
 	wsHub := ws.NewHub(cfg.Log)
 	polEngine := policy.NewEngine(cfg.Log)
 	gitopsEng := gitops.NewEngine(cfg.Log)
+	whMgr := webhook.NewManager(cfg.Log)
+	ppMgr := mesh.NewProxyPatchManager(cfg.Log)
 
 	hostInfo := hardware.DetectHost()
 	alloc := hardware.ComputeAllocation(hostInfo, cfg.CPULimit, cfg.MemoryLimit, cfg.GPULimit)
@@ -249,6 +254,8 @@ func New(cfg Config) (*Server, error) {
 		cni:             inbuiltCNI,
 		policyEngine:    polEngine,
 		gitopsEngine:    gitopsEng,
+		webhookMgr:      whMgr,
+		proxyPatchMgr:   ppMgr,
 		hostInfo:        hostInfo,
 		alloc:           alloc,
 	}
@@ -508,6 +515,29 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(app)
+		})
+	})
+
+	// ── Webhook Engine & Event Dispatcher API ────────────────────────────
+	r.Route("/apis/webhook.tarak.io/v1", func(r chi.Router) {
+		r.Get("/endpoints", func(w http.ResponseWriter, req *http.Request) {
+			list := s.webhookMgr.ListWebhooks()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": list})
+		})
+		r.Get("/deliveries", func(w http.ResponseWriter, req *http.Request) {
+			dels := s.webhookMgr.ListDeliveries()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": dels})
+		})
+	})
+
+	// ── Service Mesh Programmable ProxyPatch Middleware API ───────────────
+	r.Route("/apis/mesh.tarak.io/v1/proxypatches", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+			patches := s.proxyPatchMgr.ListPatches()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": patches})
 		})
 	})
 
