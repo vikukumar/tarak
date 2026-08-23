@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,5 +86,43 @@ func TestMesh_CanaryAndCircuitBreaker(t *testing.T) {
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
+	}
+}
+
+func TestMultiMesh_TenancyAndDNS(t *testing.T) {
+	log := zaptest.NewLogger(t)
+	mm := NewMultiMeshManager(log)
+
+	// Test DNS resolver
+	dns := NewDNSResolver()
+	vip, hostnames := dns.RegisterService("finance-mesh", "prod", "payments-svc")
+	if !strings.HasPrefix(vip, "240.240.") {
+		t.Fatalf("expected 240.240.x.x virtual VIP, got: %s", vip)
+	}
+	if len(hostnames) < 2 {
+		t.Fatalf("expected at least 2 hostnames, got: %v", hostnames)
+	}
+
+	resolvedVIP, ok := dns.Resolve("payments-svc.prod.mesh")
+	if !ok || resolvedVIP != vip {
+		t.Fatalf("expected resolved VIP %s, got %s", vip, resolvedVIP)
+	}
+
+	// Test Multi-Mesh Auto-Enrollment
+	svc := mm.AutoEnrollWorkload("finance-mesh", "prod", "ledger", 9000, "grpc", []string{"10.244.1.5:9000"})
+	if svc.VirtualVIP == "" {
+		t.Fatal("expected non-empty virtual VIP")
+	}
+	if svc.SPIFFEID != "spiffe://finance-mesh.tarak.mesh/ns/prod/sa/ledger" {
+		t.Fatalf("unexpected SPIFFE ID: %s", svc.SPIFFEID)
+	}
+
+	// Test List Meshes HTTP Handler
+	req := httptest.NewRequest("GET", "/apis/mesh.tarak.io/v1/meshes", nil)
+	w := httptest.NewRecorder()
+	mm.HandleListMeshes(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
 	}
 }

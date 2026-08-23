@@ -19,13 +19,14 @@ import { WebTerminal } from './WebTerminal';
 import { HubbleVisualizer } from './HubbleVisualizer';
 import { RbacMatrix } from './RbacMatrix';
 import { SsoSecurity } from './SsoSecurity';
+import { MeshManager } from './MeshManager';
 
 interface Props {
   onToast: (msg: string) => void;
 }
 
 export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'topology' | 'workloads' | 'exec' | 'hubble' | 'rbac' | 'sso'>('topology');
+  const [activeSubTab, setActiveSubTab] = useState<'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso'>('topology');
   const [namespace, setNamespace] = useState<string>('default');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -38,7 +39,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
   };
 
   interface NavItem {
-    id: 'topology' | 'workloads' | 'exec' | 'hubble' | 'rbac' | 'sso';
+    id: 'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso';
     label: string;
     icon: LucideIcon;
     badge?: string;
@@ -48,6 +49,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
     { id: 'topology', label: 'GitOps Topology (ArgoCD)', icon: GitBranch, badge: 'Live' },
     { id: 'workloads', label: 'Workloads & Resources', icon: Layers },
     { id: 'exec', label: 'Container Exec & Logs', icon: Terminal },
+    { id: 'mesh', label: 'Service Mesh (Kuma)', icon: Server, badge: 'Multi-Mesh' },
     { id: 'hubble', label: 'Hubble Network Flows', icon: Activity, badge: 'Realtime' },
     { id: 'rbac', label: 'RBAC Policy Matrix', icon: ShieldAlert },
     { id: 'sso', label: 'SSO & Security Center', icon: Key }
@@ -177,6 +179,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
         {activeSubTab === 'topology' && <AppTopologyView namespace={namespace} onToast={onToast} />}
         {activeSubTab === 'workloads' && <WorkloadManager namespace={namespace} onToast={onToast} />}
         {activeSubTab === 'exec' && <WebTerminal namespace={namespace} onToast={onToast} />}
+        {activeSubTab === 'mesh' && <MeshManager onToast={onToast} />}
         {activeSubTab === 'hubble' && <HubbleVisualizer namespace={namespace} />}
         {activeSubTab === 'rbac' && <RbacMatrix onToast={onToast} />}
         {activeSubTab === 'sso' && <SsoSecurity onToast={onToast} />}

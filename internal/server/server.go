@@ -139,6 +139,7 @@ type Server struct {
 	hubbleCollector *telemetry.Collector
 	lbCtrl          *loadbalancer.Controller
 	meshEngine      *mesh.Engine
+	multiMeshMgr    *mesh.MultiMeshManager
 	zeroTrustMgr    *zerotrust.Manager
 }
 
@@ -172,6 +173,7 @@ func New(cfg Config) (*Server, error) {
 	hubbleColl := telemetry.NewCollector(cfg.Log)
 	lbCtrl := loadbalancer.NewController(cfg.Log)
 	meshEngine := mesh.NewEngine(cfg.Log)
+	multiMeshMgr := mesh.NewMultiMeshManager(cfg.Log)
 	zeroTrustMgr := zerotrust.NewManager(cfg.Log)
 
 	// Add state store health check.
@@ -192,6 +194,7 @@ func New(cfg Config) (*Server, error) {
 		hubbleCollector: hubbleColl,
 		lbCtrl:          lbCtrl,
 		meshEngine:      meshEngine,
+		multiMeshMgr:    multiMeshMgr,
 		zeroTrustMgr:    zeroTrustMgr,
 	}
 	return s, nil
@@ -361,8 +364,15 @@ func (s *Server) Run(ctx context.Context) error {
 	// ── Bare-Metal Load Balancer API ──────────────────────────────────────
 	r.Get("/apis/networking.tarak.io/v1/loadbalancer/status", s.lbCtrl.HandleStatus)
 
-	// ── Inbuilt Service Mesh API ──────────────────────────────────────────
+	// ── Inbuilt Multi-Mesh API (Kuma / Kong Mesh equivalent) ──────────────
 	r.Route("/apis/mesh.tarak.io/v1", func(r chi.Router) {
+		r.Get("/meshes", s.multiMeshMgr.HandleListMeshes)
+		r.Post("/meshes", s.multiMeshMgr.HandleCreateMesh)
+		r.Get("/meshes/{mesh}/services", s.multiMeshMgr.HandleListServices)
+		r.Get("/meshes/{mesh}/external-services", s.multiMeshMgr.HandleListExternalServices)
+		r.Get("/meshes/{mesh}/traffic-permissions", s.multiMeshMgr.HandleListTrafficPermissions)
+		r.Get("/meshes/{mesh}/passthrough-policies", s.multiMeshMgr.HandleListPassthroughPolicies)
+		r.Get("/meshes/{mesh}/proxy-patches", s.multiMeshMgr.HandleListProxyPatches)
 		r.Get("/routes", s.meshEngine.HandleListRoutes)
 		r.Post("/routes", s.meshEngine.HandleCreateRoute)
 		r.Delete("/namespaces/{namespace}/routes/{name}", s.meshEngine.HandleDeleteRoute)
