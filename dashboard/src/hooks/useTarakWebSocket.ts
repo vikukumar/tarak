@@ -16,19 +16,29 @@ export function useTarakWebSocket(onEvent?: (evt: WsEvent) => void) {
   const [lastEvent, setLastEvent] = useState<WsEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const onEventRef = useRef(onEvent);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
 
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    // Clean up existing
-    if (wsRef.current) {
-      wsRef.current.close();
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN ||
+        wsRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
     const token = getAuthToken();
-    const url = `${protocol}//${host}/apis/ws.tarak.io/v1/live${token ? `?token=${token}` : ""}`;
+    const url = `${protocol}//${host}/apis/ws.tarak.io/v1/live${
+      token ? `?token=${token}` : ""
+    }`;
 
     try {
       const ws = new WebSocket(url);
@@ -42,18 +52,23 @@ export function useTarakWebSocket(onEvent?: (evt: WsEvent) => void) {
         try {
           const parsed: WsEvent = JSON.parse(event.data);
           setLastEvent(parsed);
-          if (onEvent) {
-            onEvent(parsed);
+          if (onEventRef.current) {
+            onEventRef.current(parsed);
           }
         } catch {
-          // ignore unparsable
+          // ignore unparsable telemetry
         }
       };
 
       ws.onclose = () => {
         setIsConnected(false);
-        // Automatic reconnect with backoff
-        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        wsRef.current = null;
+        if (!reconnectTimeoutRef.current) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            connect();
+          }, 3000);
+        }
       };
 
       ws.onerror = () => {
@@ -61,18 +76,25 @@ export function useTarakWebSocket(onEvent?: (evt: WsEvent) => void) {
       };
     } catch {
       setIsConnected(false);
-      reconnectTimeoutRef.current = setTimeout(connect, 5000);
+      if (!reconnectTimeoutRef.current) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = null;
+          connect();
+        }, 5000);
+      }
     }
-  }, [onEvent]);
+  }, []);
 
   useEffect(() => {
     connect();
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
   }, [connect]);

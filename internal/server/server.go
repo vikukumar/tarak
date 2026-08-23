@@ -596,9 +596,8 @@ func (s *Server) loadOrInitPKI() (*tls.Config, *x509.CertPool, error) {
 
 	tlsCfg := &tls.Config{
 		Certificates: []tls.Certificate{serverTLSCert},
-		ClientCAs:    caPool,
-		ClientAuth:   tls.RequestClientCert, // optional mTLS; checked by auth middleware
-		MinVersion:   tls.VersionTLS13,
+		ClientAuth:   tls.RequestClientCert, // optional mTLS; verified by auth middleware against caPool
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	return tlsCfg, caPool, nil

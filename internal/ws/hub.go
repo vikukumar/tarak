@@ -89,7 +89,7 @@ func (h *Hub) run() {
 			h.mu.Unlock()
 			h.log.Debug("websocket client connected", zap.Int("totalClients", len(h.clients)))
 
-			// Send welcome event
+			// Send welcome event safely through write pump
 			welcome := Event{
 				Type:      "CONNECTED",
 				Resource:  "Cluster",
@@ -102,7 +102,10 @@ func (h *Hub) run() {
 				},
 			}
 			raw, _ := json.Marshal(welcome)
-			h.sendFrame(client.conn, raw)
+			select {
+			case client.send <- raw:
+			default:
+			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
