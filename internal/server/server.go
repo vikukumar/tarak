@@ -440,6 +440,32 @@ func (s *Server) Run(ctx context.Context) error {
 		registerAPIExtensionsResources("apiextensions.tarak.io", r, s.store, wh, s.log)
 	})
 
+	// Autoscaling API groups (HPA)
+	r.Route("/apis/autoscaling/v2", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("autoscaling", "v2"))
+		registerAutoscalingResources("autoscaling", "v2", r, s.store, wh, s.log)
+	})
+	r.Route("/apis/autoscaling.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("autoscaling.tarak.io", "v1"))
+		registerAutoscalingResources("autoscaling.tarak.io", "v1", r, s.store, wh, s.log)
+	})
+
+	// Policy API groups (PDB)
+	r.Route("/apis/policy/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("policy", "v1"))
+		registerPolicyResourceDescriptors("policy", "v1", r, s.store, wh, s.log)
+	})
+	r.Route("/apis/policy.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("policy.tarak.io", "v1"))
+		registerPolicyResourceDescriptors("policy.tarak.io", "v1", r, s.store, wh, s.log)
+	})
+
+	// Helm API groups
+	r.Route("/apis/helm.tarak.io/v1", func(r chi.Router) {
+		r.Get("/", s.serveAPIResourceList("helm.tarak.io", "v1"))
+		registerHelmResources("helm.tarak.io", "v1", r, s.store, wh, s.log)
+	})
+
 	// Pod subresource & container execution routes
 	r.Get("/api/v1/namespaces/{namespace}/pods/{name}/log", s.HandlePodLogs)
 	r.Post("/api/v1/namespaces/{namespace}/pods/{name}/exec", s.HandlePodExec)
@@ -1249,6 +1275,27 @@ func registerStorageResources(group string, r chi.Router, store statestore.Store
 	}
 }
 
+func registerAutoscalingResources(group, version string, r chi.Router, store statestore.Store, wh *tarakwatch.Handler, log *zap.Logger) {
+	for _, desc := range autoscalingResourceDescriptors(group, version) {
+		h := handler.NewResourceHandler(desc, store, wh, log.Named(desc.Resource))
+		h.RegisterRoutes(r)
+	}
+}
+
+func registerPolicyResourceDescriptors(group, version string, r chi.Router, store statestore.Store, wh *tarakwatch.Handler, log *zap.Logger) {
+	for _, desc := range policyResourceDescriptors(group, version) {
+		h := handler.NewResourceHandler(desc, store, wh, log.Named(desc.Resource))
+		h.RegisterRoutes(r)
+	}
+}
+
+func registerHelmResources(group, version string, r chi.Router, store statestore.Store, wh *tarakwatch.Handler, log *zap.Logger) {
+	for _, desc := range helmResourceDescriptors(group, version) {
+		h := handler.NewResourceHandler(desc, store, wh, log.Named(desc.Resource))
+		h.RegisterRoutes(r)
+	}
+}
+
 func registerSecurityResources(r chi.Router, store statestore.Store, wh *tarakwatch.Handler, log *zap.Logger) {
 	for _, desc := range tarakSecurityResourceDescriptors() {
 		h := handler.NewResourceHandler(desc, store, wh, log.Named(desc.Resource))
@@ -1363,6 +1410,27 @@ func apiExtensionsResourceDescriptors(group string) []handler.ResourceDescriptor
 	}
 }
 
+func autoscalingResourceDescriptors(group, version string) []handler.ResourceDescriptor {
+	std := []string{"create", "delete", "get", "list", "patch", "update", "watch"}
+	return []handler.ResourceDescriptor{
+		{Group: group, Version: version, Resource: "horizontalpodautoscalers", Kind: "HorizontalPodAutoscaler", Namespaced: true, Verbs: std, ShortNames: []string{"hpa"}},
+	}
+}
+
+func policyResourceDescriptors(group, version string) []handler.ResourceDescriptor {
+	std := []string{"create", "delete", "get", "list", "patch", "update", "watch"}
+	return []handler.ResourceDescriptor{
+		{Group: group, Version: version, Resource: "poddisruptionbudgets", Kind: "PodDisruptionBudget", Namespaced: true, Verbs: std, ShortNames: []string{"pdb"}},
+	}
+}
+
+func helmResourceDescriptors(group, version string) []handler.ResourceDescriptor {
+	std := []string{"create", "delete", "get", "list", "patch", "update", "watch"}
+	return []handler.ResourceDescriptor{
+		{Group: group, Version: version, Resource: "releases", Kind: "HelmRelease", Namespaced: true, Verbs: std, ShortNames: []string{"hr", "helmrelease"}},
+	}
+}
+
 // allResourceDescriptors returns all resource descriptors for a given group/version (for API discovery).
 func allResourceDescriptors(group, version string) []map[string]interface{} {
 	var descs []handler.ResourceDescriptor
@@ -1383,6 +1451,12 @@ func allResourceDescriptors(group, version string) []map[string]interface{} {
 		descs = tarakSecurityResourceDescriptors()
 	case (group == "apiextensions.k8s.io" || group == "apiextensions.tarak.io") && version == "v1":
 		descs = apiExtensionsResourceDescriptors(group)
+	case (group == "autoscaling" || group == "autoscaling.tarak.io"):
+		descs = autoscalingResourceDescriptors(group, version)
+	case (group == "policy" || group == "policy.tarak.io"):
+		descs = policyResourceDescriptors(group, version)
+	case (group == "helm.tarak.io"):
+		descs = helmResourceDescriptors(group, version)
 	case group == "metrics.k8s.io" && version == "v1beta1":
 		descs = metricsResourceDescriptors()
 	}

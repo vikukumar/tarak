@@ -141,6 +141,29 @@ func (h *ResourceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Service ClusterIP defaulting
+	if h.desc.Resource == "services" || h.desc.Kind == "Service" {
+		var svcMap map[string]interface{}
+		if err := json.Unmarshal(body, &svcMap); err == nil {
+			spec, _ := svcMap["spec"].(map[string]interface{})
+			if spec != nil {
+				sType, _ := spec["type"].(string)
+				cIP, _ := spec["clusterIP"].(string)
+				if cIP == "" && sType != "ExternalName" {
+					hVal := 0
+					for _, ch := range key.Name {
+						hVal = (hVal*31 + int(ch)) % 240
+					}
+					spec["clusterIP"] = fmt.Sprintf("10.96.0.%d", hVal+10)
+					svcMap["spec"] = spec
+					if mutated, mErr := json.Marshal(svcMap); mErr == nil {
+						body = mutated
+					}
+				}
+			}
+		}
+	}
+
 	env, err := h.store.Create(r.Context(), key, body)
 	if err != nil {
 		h.writeStoreError(w, err)

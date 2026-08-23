@@ -190,19 +190,95 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		return startBuiltinHTTPServer(ctx, cfg.ID, webRoot, port, logFile)
 
 	case ImageTypeNodeJS:
-		if nodeBin, err := exec.LookPath("node"); err == nil {
-			logStartup(fmt.Sprintf("running Node.js container with host node binary (%s)", nodeBin))
-			nodeArgs := cfg.Command
-			if len(nodeArgs) > 0 && (nodeArgs[0] == "node" || strings.HasSuffix(nodeArgs[0], "/node")) {
-				nodeArgs = nodeArgs[1:]
+		workDir := cfg.WorkingDir
+		if workDir != "" && workDir != "/" {
+			cand := filepath.Join(cfg.Rootfs, filepath.FromSlash(strings.TrimPrefix(workDir, "/")))
+			if info, err := os.Stat(cand); err == nil && info.IsDir() {
+				workDir = cand
+			} else {
+				workDir = cfg.Rootfs
 			}
-			return startNativeProcess(ctx, cfg.ID, nodeBin, nodeArgs, cfg.Env, cfg.WorkingDir, logFile)
-		}
-		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
-			return proc, nil
+		} else {
+			workDir = cfg.Rootfs
 		}
 
+		unwrapped := unwrapContainerCommand(cfg.Command)
+		if len(unwrapped) > 0 {
+			first := strings.ToLower(filepath.Base(unwrapped[0]))
+			first = strings.TrimSuffix(first, ".cmd")
+			first = strings.TrimSuffix(first, ".exe")
+
+			// Check for npm, yarn, pnpm runners
+			if first == "npm" || first == "yarn" || first == "pnpm" || first == "npx" {
+				var runnerBin string
+				var err error
+				for _, name := range []string{first, first + ".cmd", first + ".exe", first + ".bat"} {
+					if p, lErr := exec.LookPath(name); lErr == nil {
+						runnerBin = p
+						break
+					}
+				}
+				if runnerBin != "" {
+					logStartup(fmt.Sprintf("running Node.js container with host %s binary (%s %s)", first, runnerBin, strings.Join(unwrapped[1:], " ")))
+					return startNativeProcess(ctx, cfg.ID, runnerBin, unwrapped[1:], cfg.Env, workDir, logFile)
+				}
+				_ = err
+			}
+
+			// Check for direct node execution
+			if first == "node" || first == "nodejs" {
+				unwrapped = unwrapped[1:]
+			}
+		}
+
+		if nodeBin, err := exec.LookPath("node"); err == nil {
+			nodeArgs := unwrapped
+			if len(nodeArgs) == 0 {
+				for _, candidate := range []string{"server.js", "index.js", "app.js", "main.js", "dist/index.js", "src/index.js"} {
+					if fileExistsIn(workDir, candidate) {
+						nodeArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
+						break
+					}
+					if fileExistsIn(cfg.Rootfs, candidate) {
+						nodeArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
+						break
+					}
+				}
+			} else {
+				// Resolve script path relative to workDir/rootfs if it exists
+				script := nodeArgs[0]
+				if fileExistsIn(workDir, script) {
+					nodeArgs[0] = filepath.Join(workDir, filepath.FromSlash(script))
+				} else if fileExistsIn(cfg.Rootfs, script) {
+					nodeArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(script))
+				}
+			}
+			if len(nodeArgs) > 0 {
+				logStartup(fmt.Sprintf("running Node.js container with host node binary (%s %s)", nodeBin, strings.Join(nodeArgs, " ")))
+				return startNativeProcess(ctx, cfg.ID, nodeBin, nodeArgs, cfg.Env, workDir, logFile)
+			}
+		}
+		webRoot := FindWebRoot(cfg.Rootfs, imgType)
+		port := 80
+		if len(ports) > 0 && ports[0] > 0 {
+			port = ports[0]
+		}
+		logStartup(fmt.Sprintf("Node.js image web bridge running on :%d (webroot: %s)", port, webRoot))
+		return startBuiltinHTTPServer(ctx, cfg.ID, webRoot, port, logFile)
+
 	case ImageTypePython:
+		workDir := cfg.WorkingDir
+		if workDir != "" && workDir != "/" {
+			cand := filepath.Join(cfg.Rootfs, filepath.FromSlash(strings.TrimPrefix(workDir, "/")))
+			if info, err := os.Stat(cand); err == nil && info.IsDir() {
+				workDir = cand
+			} else {
+				workDir = cfg.Rootfs
+			}
+		} else {
+			workDir = cfg.Rootfs
+		}
+
 		pyBin := ""
 		if p, err := exec.LookPath("python3"); err == nil {
 			pyBin = p
@@ -210,16 +286,45 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			pyBin = p
 		}
 		if pyBin != "" {
-			logStartup(fmt.Sprintf("running Python container with host python binary (%s)", pyBin))
-			pyArgs := cfg.Command
-			if len(pyArgs) > 0 && (strings.HasPrefix(pyArgs[0], "python") || strings.Contains(pyArgs[0], "/python")) {
-				pyArgs = pyArgs[1:]
+			unwrapped := unwrapContainerCommand(cfg.Command)
+			if len(unwrapped) > 0 {
+				first := strings.ToLower(filepath.Base(unwrapped[0]))
+				if first == "python" || first == "python3" || first == "python2" {
+					unwrapped = unwrapped[1:]
+				}
 			}
-			return startNativeProcess(ctx, cfg.ID, pyBin, pyArgs, cfg.Env, cfg.WorkingDir, logFile)
+			pyArgs := unwrapped
+			if len(pyArgs) == 0 {
+				for _, candidate := range []string{"app.py", "main.py", "server.py", "wsgi.py", "src/main.py"} {
+					if fileExistsIn(workDir, candidate) {
+						pyArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
+						break
+					}
+					if fileExistsIn(cfg.Rootfs, candidate) {
+						pyArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
+						break
+					}
+				}
+			} else {
+				script := pyArgs[0]
+				if fileExistsIn(workDir, script) {
+					pyArgs[0] = filepath.Join(workDir, filepath.FromSlash(script))
+				} else if fileExistsIn(cfg.Rootfs, script) {
+					pyArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(script))
+				}
+			}
+			if len(pyArgs) > 0 {
+				logStartup(fmt.Sprintf("running Python container with host python binary (%s %s)", pyBin, strings.Join(pyArgs, " ")))
+				return startNativeProcess(ctx, cfg.ID, pyBin, pyArgs, cfg.Env, workDir, logFile)
+			}
 		}
-		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
-			return proc, nil
+		webRoot := FindWebRoot(cfg.Rootfs, imgType)
+		port := 80
+		if len(ports) > 0 && ports[0] > 0 {
+			port = ports[0]
 		}
+		logStartup(fmt.Sprintf("Python image web bridge running on :%d (webroot: %s)", port, webRoot))
+		return startBuiltinHTTPServer(ctx, cfg.ID, webRoot, port, logFile)
 
 	case ImageTypeWASM:
 		wasmPath := findWASMFile(cfg.Rootfs)
@@ -233,11 +338,15 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
 			return proc, nil
 		}
-	}
-
-	// Try to find and run a platform-native binary in the rootfs or on PATH
-	if proc, err := tryRunNativeBinary(ctx, cfg, logFile); err == nil {
-		return proc, nil
+		webRoot := FindWebRoot(cfg.Rootfs, imgType)
+		if webRoot != "" || len(ports) > 0 {
+			port := 80
+			if len(ports) > 0 && ports[0] > 0 {
+				port = ports[0]
+			}
+			logStartup(fmt.Sprintf("starting native bridge application server on :%d", port))
+			return startBuiltinHTTPServer(ctx, cfg.ID, webRoot, port, logFile)
+		}
 	}
 
 	// Nothing worked — give a clear, helpful error
@@ -602,4 +711,44 @@ func isLinuxELFFile(path string) bool {
 		return false
 	}
 	return magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F'
+}
+
+// unwrapContainerCommand strips container init wrappers (/sbin/tini, dumb-init, docker-entrypoint.sh, sh -c, --)
+// to reveal the actual runtime command and arguments.
+func unwrapContainerCommand(cmd []string) []string {
+	if len(cmd) == 0 {
+		return cmd
+	}
+	out := make([]string, len(cmd))
+	copy(out, cmd)
+
+	for len(out) > 0 {
+		first := strings.ToLower(filepath.Base(out[0]))
+		first = strings.TrimSuffix(first, ".exe")
+		first = strings.TrimSuffix(first, ".sh")
+
+		if first == "tini" || first == "dumb-init" || first == "docker-entrypoint" || first == "entrypoint" || out[0] == "--" {
+			out = out[1:]
+			continue
+		}
+		if (first == "sh" || first == "bash") && len(out) > 1 {
+			if out[1] == "-c" {
+				if len(out) > 2 {
+					words := strings.Fields(out[2])
+					if len(words) > 0 {
+						out = append(words, out[3:]...)
+						continue
+					}
+				}
+				out = out[2:]
+				continue
+			}
+			if !strings.HasPrefix(out[1], "-") {
+				out = out[1:]
+				continue
+			}
+		}
+		break
+	}
+	return out
 }

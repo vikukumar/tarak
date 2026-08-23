@@ -1,15 +1,15 @@
 # 1. Clean old embedded UI artifacts
 Remove-Item -Path ".\internal\ui\dist\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-# 2. Build Next.js Dashboard UI
-cd dashboard
+# 2. Build the Next.js Dashboard UI
+Set-Location dashboard
 npm run build
-cd ..
+Set-Location ..
 
 # 3. Build Vite React Documentation Portal
-cd web
+Set-Location web
 npm run build
-cd ..
+Set-Location ..
 
 # 4. Copy clean Next.js export into internal/ui/dist
 Copy-Item -Path ".\dashboard\out\*" -Destination ".\internal\ui\dist" -Recurse -Force
