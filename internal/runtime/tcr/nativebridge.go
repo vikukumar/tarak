@@ -202,6 +202,9 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		} else {
 			workDir = cfg.Rootfs
 		}
+		if abs, err := filepath.Abs(workDir); err == nil {
+			workDir = abs
+		}
 
 		unwrapped := unwrapContainerCommand(cfg.Command)
 		var extraEnvs []string
@@ -250,21 +253,22 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			if len(nodeArgs) == 0 {
 				for _, candidate := range []string{"src/server.js", "src/index.js", "src/app.js", "server.js", "index.js", "app.js", "main.js", "dist/index.js"} {
 					if fileExistsIn(workDir, candidate) {
-						nodeArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
+						nodeArgs = []string{candidate}
 						break
 					}
 					if fileExistsIn(cfg.Rootfs, candidate) {
-						nodeArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
+						absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate)))
+						nodeArgs = []string{absPath}
 						break
 					}
 				}
 			} else {
-				// Resolve script path relative to workDir/rootfs if it exists
 				script := nodeArgs[0]
 				if fileExistsIn(workDir, script) {
-					nodeArgs[0] = filepath.Join(workDir, filepath.FromSlash(script))
+					nodeArgs[0] = script
 				} else if fileExistsIn(cfg.Rootfs, script) {
-					nodeArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(script))
+					absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(script)))
+					nodeArgs[0] = absPath
 				}
 			}
 			if len(nodeArgs) > 0 {
@@ -292,6 +296,9 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		} else {
 			workDir = cfg.Rootfs
 		}
+		if abs, err := filepath.Abs(workDir); err == nil {
+			workDir = abs
+		}
 
 		pyBin := ""
 		if p, err := exec.LookPath("python3"); err == nil {
@@ -311,20 +318,22 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			if len(pyArgs) == 0 {
 				for _, candidate := range []string{"app.py", "main.py", "server.py", "wsgi.py", "src/main.py"} {
 					if fileExistsIn(workDir, candidate) {
-						pyArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
+						pyArgs = []string{candidate}
 						break
 					}
 					if fileExistsIn(cfg.Rootfs, candidate) {
-						pyArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
+						absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate)))
+						pyArgs = []string{absPath}
 						break
 					}
 				}
 			} else {
 				script := pyArgs[0]
 				if fileExistsIn(workDir, script) {
-					pyArgs[0] = filepath.Join(workDir, filepath.FromSlash(script))
+					pyArgs[0] = script
 				} else if fileExistsIn(cfg.Rootfs, script) {
-					pyArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(script))
+					absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(script)))
+					pyArgs[0] = absPath
 				}
 			}
 			if len(pyArgs) > 0 {
