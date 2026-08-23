@@ -23,8 +23,6 @@ func Handler() http.Handler {
 		})
 	}
 
-	fileServer := http.FileServer(http.FS(distFS))
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqPath := r.URL.Path
 		cleanPath := strings.TrimPrefix(reqPath, "/")
@@ -36,11 +34,10 @@ func Handler() http.Handler {
 			if fsPath == "" {
 				return false
 			}
-			f, err := distFS.Open(fsPath)
+			data, err := fs.ReadFile(distFS, fsPath)
 			if err != nil {
 				return false
 			}
-			_ = f.Close()
 
 			ext := strings.ToLower(filepath.Ext(fsPath))
 			switch ext {
@@ -69,9 +66,9 @@ func Handler() http.Handler {
 			}
 
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			r2 := r.Clone(r.Context())
-			r2.URL.Path = "/" + fsPath
-			fileServer.ServeHTTP(w, r2)
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
 			return true
 		}
 

@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTarakWebSocket } from "@/hooks/useTarakWebSocket";
 import { Shield, ArrowRight } from "lucide-react";
 
+import { ClusterProvider } from "@/context/ClusterContext";
+
 export default function DashboardShellLayout({
   children,
 }: {
@@ -84,30 +86,32 @@ export default function DashboardShellLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#070c18] text-slate-100">
-      {/* Collapsible Sidebar */}
-      <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed(!collapsed)}
-      />
+    <ClusterProvider>
+      <div className="flex min-h-screen bg-[#070c18] text-slate-100">
+        {/* Collapsible Sidebar */}
+        <Sidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed(!collapsed)}
+        />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-6">
-        <Topbar />
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
-          {children}
-        </main>
-      </div>
-
-      {/* Mobile App Dock */}
-      <MobileBottomNav />
-
-      {/* Live Toast */}
-      {liveToast && (
-        <div className="fixed bottom-20 right-6 z-50 p-3 rounded-xl bg-slate-900/95 border border-cyan-500/40 text-xs text-white shadow-2xl animate-fade-in">
-          {liveToast}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-6">
+          <Topbar />
+          <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+            {children}
+          </main>
         </div>
-      )}
-    </div>
+
+        {/* Mobile App Dock */}
+        <MobileBottomNav />
+
+        {/* Live Toast */}
+        {liveToast && (
+          <div className="fixed bottom-20 right-6 z-50 p-3 rounded-xl bg-slate-900/95 border border-cyan-500/40 text-xs text-white shadow-2xl animate-fade-in">
+            {liveToast}
+          </div>
+        )}
+      </div>
+    </ClusterProvider>
   );
 }

@@ -2,29 +2,44 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Workflow, RefreshCw, Plus, Trash2, Edit3, Code, Play } from "lucide-react";
-import { Card } from "@/components/ui/Card";
+import {
+  Workflow,
+  RefreshCw,
+  Plus,
+  Trash2,
+  Edit3,
+  FileCode,
+  Layers,
+} from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
-import { useClusterState } from "@/hooks/useClusterState";
+import { ResourceDetailDrawer } from "@/components/drawers/ResourceDetailDrawer";
+import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 import { formatAge } from "@/lib/utils";
 
 export default function DeploymentsPage() {
-  const { selectedNamespace } = useClusterState();
+  const { selectedNamespace } = useCluster();
   const [deployments, setDeployments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedYaml, setSelectedYaml] = useState<string | null>(null);
+  const [selectedDeployment, setSelectedDeployment] = useState<any | null>(null);
   const [scaleDeployment, setScaleDeployment] = useState<any | null>(null);
   const [scaleCount, setScaleCount] = useState(1);
 
   const fetchDeployments = async () => {
     setIsLoading(true);
-    const res = await tarakFetch(`/apis/apps/v1/namespaces/${selectedNamespace}/deployments`);
-    setDeployments(res.data?.items || []);
-    setIsLoading(false);
+    try {
+      const url =
+        selectedNamespace === "_all"
+          ? "/apis/apps/v1/deployments"
+          : `/apis/apps/v1/namespaces/${selectedNamespace}/deployments`;
+      const res = await tarakFetch(url);
+      setDeployments(res.data?.items || []);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -33,6 +48,7 @@ export default function DeploymentsPage() {
 
   const handleScale = async () => {
     if (!scaleDeployment) return;
+    const ns = scaleDeployment.metadata?.namespace || selectedNamespace;
     const name = scaleDeployment.metadata?.name;
     const updated = {
       ...scaleDeployment,
@@ -41,7 +57,7 @@ export default function DeploymentsPage() {
         replicas: scaleCount,
       },
     };
-    await tarakFetch(`/apis/apps/v1/namespaces/${selectedNamespace}/deployments/${name}`, {
+    await tarakFetch(`/apis/apps/v1/namespaces/${ns}/deployments/${name}`, {
       method: "PUT",
       body: JSON.stringify(updated),
     });
@@ -49,9 +65,11 @@ export default function DeploymentsPage() {
     fetchDeployments();
   };
 
-  const handleDelete = async (name: string) => {
-    if (!confirm(`Delete deployment ${name}?`)) return;
-    await tarakFetch(`/apis/apps/v1/namespaces/${selectedNamespace}/deployments/${name}`, {
+  const handleDelete = async (dep: any) => {
+    const ns = dep.metadata?.namespace || selectedNamespace;
+    const name = dep.metadata?.name;
+    if (!confirm(`Delete deployment "${name}" in namespace "${ns}"?`)) return;
+    await tarakFetch(`/apis/apps/v1/namespaces/${ns}/deployments/${name}`, {
       method: "DELETE",
     });
     fetchDeployments();
@@ -63,9 +81,16 @@ export default function DeploymentsPage() {
       header: "Deployment Name",
       sortable: true,
       render: (d) => (
-        <div className="flex items-center gap-2">
-          <Workflow size={16} className="text-cyan-400" />
-          <span className="font-semibold text-white">{d.metadata?.name}</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <Workflow size={15} />
+          </div>
+          <div>
+            <span className="font-bold text-white block">{d.metadata?.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              ns: {d.metadata?.namespace || selectedNamespace}
+            </span>
+          </div>
         </div>
       ),
     },
@@ -95,34 +120,41 @@ export default function DeploymentsPage() {
     {
       key: "age",
       header: "Age",
-      render: (d) => formatAge(d.metadata?.creationTimestamp),
+      render: (d) => (
+        <span className="text-slate-400">
+          {formatAge(d.metadata?.creationTimestamp)}
+        </span>
+      ),
     },
     {
       key: "actions",
       header: "Actions",
       className: "text-right",
       render: (d) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center justify-end gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => {
               setScaleDeployment(d);
               setScaleCount(d.spec?.replicas || 1);
             }}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-cyan-400 transition-colors"
+            className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-cyan-500/20 text-cyan-400 border border-white/10 transition-colors"
             title="Scale Replicas"
           >
             <Edit3 size={14} />
           </button>
           <button
-            onClick={() => setSelectedYaml(JSON.stringify(d, null, 2))}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-indigo-500/20 text-indigo-400 transition-colors"
+            onClick={() => setSelectedDeployment(d)}
+            className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-indigo-500/20 text-indigo-400 border border-white/10 transition-colors"
             title="Inspect Definition"
           >
-            <Code size={14} />
+            <FileCode size={14} />
           </button>
           <button
-            onClick={() => handleDelete(d.metadata?.name)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-rose-400 transition-colors"
+            onClick={() => handleDelete(d)}
+            className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-white/10 transition-colors"
             title="Delete Deployment"
           >
             <Trash2 size={14} />
@@ -133,20 +165,28 @@ export default function DeploymentsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Workflow size={22} className="text-cyan-400" />
+          <h1 className="text-xl font-bold text-white flex items-center gap-2.5">
+            <Workflow size={24} className="text-indigo-400" />
             <span>Deployments</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Declarative workload rollouts in namespace <span className="text-cyan-400 font-mono">{selectedNamespace}</span>
+            Declarative workload rollouts in scope{" "}
+            <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+              {selectedNamespace === "_all" ? "All Namespaces" : selectedNamespace}
+            </span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={fetchDeployments} isLoading={isLoading}>
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={fetchDeployments}
+            isLoading={isLoading}
+          >
             <RefreshCw size={14} />
             <span>Refresh</span>
           </Button>
@@ -163,8 +203,11 @@ export default function DeploymentsPage() {
         columns={columns}
         data={deployments}
         searchKey="name"
-        searchPlaceholder="Filter deployments..."
-        emptyMessage={`No deployments found in ${selectedNamespace} namespace`}
+        searchPlaceholder="Filter deployments by name..."
+        emptyMessage={`No deployments found in ${
+          selectedNamespace === "_all" ? "cluster" : selectedNamespace + " namespace"
+        }`}
+        onRowClick={(d) => setSelectedDeployment(d)}
       />
 
       {/* Scale Modal */}
@@ -176,7 +219,9 @@ export default function DeploymentsPage() {
       >
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Desired Replicas</label>
+            <label className="text-xs font-semibold text-slate-300">
+              Desired Replicas
+            </label>
             <input
               type="number"
               min={0}
@@ -192,17 +237,16 @@ export default function DeploymentsPage() {
         </div>
       </Modal>
 
-      {/* Definition Modal */}
-      <Modal
-        isOpen={!!selectedYaml}
-        onClose={() => setSelectedYaml(null)}
-        title="Deployment Definition"
-        maxWidth="2xl"
-      >
-        <pre className="p-4 rounded-xl bg-slate-950 border border-white/10 text-xs font-mono text-cyan-300 overflow-x-auto">
-          {selectedYaml}
-        </pre>
-      </Modal>
+      {/* Slide-Over Detail Drawer */}
+      <ResourceDetailDrawer
+        isOpen={!!selectedDeployment}
+        onClose={() => setSelectedDeployment(null)}
+        resourceType="Deployment"
+        resourceName={selectedDeployment?.metadata?.name || ""}
+        namespace={selectedDeployment?.metadata?.namespace || selectedNamespace}
+        rawResource={selectedDeployment}
+        onActionComplete={fetchDeployments}
+      />
     </div>
   );
 }

@@ -23,18 +23,22 @@ import {
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { useClusterState } from "@/hooks/useClusterState";
+import { useCluster } from "@/context/ClusterContext";
 import { tarakFetch } from "@/lib/api";
 
 export default function ClusterOverviewPage() {
-  const { selectedNamespace, clusterInfo, refresh, isLoading } = useClusterState();
+  const { selectedNamespace, clusterInfo, refresh, isLoading } = useCluster();
   const [pods, setPods] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
+      const podsUrl =
+        selectedNamespace === "_all"
+          ? "/api/v1/pods"
+          : `/api/v1/namespaces/${selectedNamespace}/pods`;
       const [pRes, nRes] = await Promise.all([
-        tarakFetch(`/api/v1/namespaces/${selectedNamespace}/pods`),
+        tarakFetch(podsUrl),
         tarakFetch("/api/v1/nodes"),
       ]);
       setPods(pRes.data?.items || []);
