@@ -12,12 +12,77 @@ let latestVersion = 'v1.0.6';
 let allReleasesData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+  setupScrollEffects();
   setupClusterCanvas();
   setupMobileDrawer();
   setupTerminalTabs();
   setup3DTiltEffect();
+  setupRevealOnScroll();
   syncDynamicReleases();
 });
+
+// ==========================================================================
+// 0. Scroll Progress Indicator & Back-to-Top Button
+// ==========================================================================
+function setupScrollEffects() {
+  // Scroll Progress Bar
+  let progressBar = document.getElementById('scroll-progress');
+  if (!progressBar) {
+    progressBar = document.createElement('div');
+    progressBar.id = 'scroll-progress';
+    document.body.prepend(progressBar);
+  }
+
+  // Floating Back-to-Top Button
+  let backToTop = document.getElementById('back-to-top');
+  if (!backToTop) {
+    backToTop = document.createElement('button');
+    backToTop.id = 'back-to-top';
+    backToTop.innerHTML = '↑';
+    backToTop.setAttribute('aria-label', 'Back to top');
+    backToTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    document.body.appendChild(backToTop);
+  }
+
+  window.addEventListener('scroll', () => {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+    const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+    progressBar.style.width = `${scrollPercent}%`;
+
+    if (scrollTop > 350) {
+      backToTop.classList.add('visible');
+    } else {
+      backToTop.classList.remove('visible');
+    }
+  }, { passive: true });
+}
+
+// ==========================================================================
+// 0.1 Reveal On Scroll Animations
+// ==========================================================================
+function setupRevealOnScroll() {
+  const elements = document.querySelectorAll('.card, .hero, .benchmark-table, .code-block, section, .reveal');
+  elements.forEach((el, i) => {
+    if (!el.classList.contains('reveal')) {
+      el.classList.add('reveal');
+      if (i % 3 === 1) el.classList.add('delay-1');
+      if (i % 3 === 2) el.classList.add('delay-2');
+    }
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+  elements.forEach((el) => observer.observe(el));
+}
 
 // ==========================================================================
 // 1. Interactive Cluster Topology & Packet Stream Background Simulation
