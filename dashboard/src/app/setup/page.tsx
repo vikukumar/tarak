@@ -67,12 +67,13 @@ export default function SetupWizardPage() {
 
       <div className="w-full max-w-lg relative z-10">
         {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 shadow-[0_0_30px_rgba(0,240,255,0.4)] mb-4">
-            <span className="text-slate-950 font-extrabold text-2xl">T</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">TARAK CLUSTER SETUP</h1>
-          <p className="text-sm text-slate-400 mt-1">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img
+            src="/assets/tarak_logo_vertical.png"
+            alt="TARAK Cluster Setup"
+            className="w-44 object-contain drop-shadow-[0_0_25px_rgba(0,240,255,0.35)] mb-3"
+          />
+          <p className="text-xs text-slate-400 mt-1">
             Initialize Cluster Root Authority & Create Super-Admin
           </p>
         </div>

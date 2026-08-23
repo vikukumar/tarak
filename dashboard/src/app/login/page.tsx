@@ -61,12 +61,13 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 shadow-[0_0_30px_rgba(0,240,255,0.4)] mb-4">
-            <span className="text-slate-950 font-extrabold text-2xl">T</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">TARAK CONTROL PLANE</h1>
-          <p className="text-xs text-slate-400 mt-1">Authenticate to access cluster dashboard</p>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img
+            src="/assets/tarak_logo_vertical.png"
+            alt="TARAK Control Plane"
+            className="w-44 object-contain drop-shadow-[0_0_25px_rgba(0,240,255,0.35)] mb-3"
+          />
+          <p className="text-xs text-slate-400">Authenticate to access cluster control plane</p>
         </div>
 
         <Card className="border border-white/10 p-6 md:p-8 shadow-2xl space-y-6">

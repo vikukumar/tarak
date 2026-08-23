@@ -151,22 +151,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-5 border-b border-white/10">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.4)] flex-shrink-0">
-            <span className="font-bold text-slate-950 text-lg">T</span>
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-bold text-white text-base tracking-wider leading-none">
-                TARAK
-              </span>
-              <span className="text-[10px] text-cyan-400 font-mono tracking-widest mt-1">
-                CONTROL PLANE
-              </span>
-            </div>
+      <div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
+        <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
+          {collapsed ? (
+            <img
+              src="/assets/icon.png"
+              alt="Tarak Icon"
+              className="w-9 h-9 rounded-xl object-contain drop-shadow-[0_0_12px_rgba(0,240,255,0.4)] flex-shrink-0"
+            />
+          ) : (
+            <img
+              src="/assets/tarak_logo_horizontal.png"
+              alt="TARAK Platform"
+              className="h-9 max-w-[180px] object-contain drop-shadow-[0_0_12px_rgba(0,240,255,0.25)]"
+            />
           )}
-        </div>
+        </Link>
         <button
           onClick={onToggleCollapse}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"

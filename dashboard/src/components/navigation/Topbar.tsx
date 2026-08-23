@@ -69,9 +69,17 @@ export const Topbar: React.FC<TopbarProps> = () => {
     <header className="h-16 border-b border-white/10 bg-[#070c18]/80 backdrop-blur-xl sticky top-0 z-20 px-4 md:px-6 flex items-center justify-between gap-4">
       {/* Left: Cluster Status & Dynamic Namespace Filter */}
       <div className="flex items-center gap-3 md:gap-5">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
+        <a href="/dashboard" className="md:hidden flex items-center">
+          <img
+            src="/assets/tarak_logo_horizontal.png"
+            alt="TARAK"
+            className="h-7 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.3)]"
+          />
+        </a>
+
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse" />
-          <span className="hidden sm:inline">tarak-cluster-prod</span>
+          <span>tarak-cluster-prod</span>
         </div>
 
         {/* Dynamic Namespace Selector */}
