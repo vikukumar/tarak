@@ -1,7 +1,7 @@
 {
   "name": "tarak-docs-web",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.14",
   "type": "module",
   "scripts": {
     "dev": "vite",
