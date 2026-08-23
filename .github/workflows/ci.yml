@@ -14,11 +14,27 @@ on:
 
 jobs:
   test:
-    name: Test & Lint
+    name: Test & Cross-Platform Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'dashboard/package-lock.json'
+
+      - name: Build Next.js Dashboard UI
+        run: |
+          cd dashboard
+          npm ci || npm install
+          npm run build
+          cd ..
+          rm -rf internal/ui/dist/*
+          cp -r dashboard/out/* internal/ui/dist/
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -31,10 +47,13 @@ jobs:
 
       - name: Verify Cross-Platform Compilation
         run: |
-          PLATFORMS=("linux/amd64" "linux/arm64" "windows/amd64" "darwin/arm64")
+          PLATFORMS=("linux/amd64" "linux/arm64" "windows/amd64" "windows/arm64" "darwin/amd64" "darwin/arm64")
           for PLATFORM in "${PLATFORMS[@]}"; do
             IFS='/' read -r GOOS GOARCH <<< "$PLATFORM"
             echo "Checking $GOOS/$GOARCH..."
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/tarak
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/tarakctl
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/taraktl
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/tarakd
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/taraks
           done
