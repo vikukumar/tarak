@@ -236,6 +236,9 @@ func newServerCmd() *cobra.Command {
 		allowInsecure    bool
 		logLevel         string
 		shutdownTimeout  time.Duration
+		cpuLimit         string
+		memoryLimit      string
+		gpuLimit         string
 	)
 
 	cmd := &cobra.Command{
@@ -264,6 +267,9 @@ func newServerCmd() *cobra.Command {
 				DataDir:            dataDir,
 				AllowInsecureAuth:  allowInsecure,
 				SANs:               sans,
+				CPULimit:           cpuLimit,
+				MemoryLimit:        memoryLimit,
+				GPULimit:           gpuLimit,
 				Log:                logger,
 				ShutdownTimeout:    shutdownTimeout,
 			})
@@ -289,6 +295,9 @@ func newServerCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowInsecure, "insecure", false, "Allow unauthenticated access (dev only)")
 	cmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level: debug|info|warn|error")
 	cmd.Flags().DurationVar(&shutdownTimeout, "shutdown-timeout", 30*time.Second, "Graceful shutdown deadline")
+	cmd.Flags().StringVar(&cpuLimit, "cpu-limit", "", "CPU cores limit for node allocation (defaults to 100% host CPUs)")
+	cmd.Flags().StringVar(&memoryLimit, "memory-limit", "", "Memory limit for node allocation (e.g. 16Gi, defaults to 100% host RAM)")
+	cmd.Flags().StringVar(&gpuLimit, "gpu-limit", "", "GPU limit for node allocation (defaults to all host GPUs)")
 
 	return cmd
 }

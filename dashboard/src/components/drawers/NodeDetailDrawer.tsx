@@ -64,10 +64,19 @@ export const NodeDetailDrawer: React.FC<NodeDetailDrawerProps> = ({
   };
 
   const capacity = nodeData?.status?.capacity || {
-    cpu: "8",
-    memory: "16384Mi",
+    cpu: "12",
+    memory: "32768Mi",
+    gpu: "0",
     pods: "110",
   };
+
+  const labels = nodeData?.metadata?.labels || {};
+  const addresses = nodeData?.status?.addresses || [];
+  const lanIP = addresses.find((a: any) => a.type === "InternalIP")?.address || labels["tarak.io/host-lan-ip"] || "127.0.0.1";
+  const publicIP = addresses.find((a: any) => a.type === "ExternalIP")?.address || labels["tarak.io/host-public-ip"] || lanIP;
+  const cpuModel = labels["tarak.io/cpu-model"] || `Host CPU (${capacity.cpu} Cores)`;
+  const totalRAMGB = labels["tarak.io/total-memory-gb"] || capacity.memory;
+  const isFullHost = labels["tarak.io/full-host-allocation"] === "true";
 
   const handleToggleCordon = () => {
     setActionLoading(true);
@@ -94,11 +103,11 @@ export const NodeDetailDrawer: React.FC<NodeDetailDrawerProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase font-mono tracking-wider text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                  Control Plane & Worker
+                  {isFullHost ? "100% Host Machine Allocation" : "Custom Quota Node"}
                 </span>
                 <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                   <CheckCircle2 size={12} />
-                  Ready
+                  Host Bridge Ready
                 </span>
               </div>
               <h2 className="text-lg font-bold text-white tracking-tight mt-0.5">
@@ -132,32 +141,67 @@ export const NodeDetailDrawer: React.FC<NodeDetailDrawerProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* Capacity Metrics */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-1">
               <div className="flex items-center justify-between text-slate-400 text-xs">
                 <span>CPU Cores</span>
                 <Cpu size={14} className="text-cyan-400" />
               </div>
               <span className="text-xl font-bold text-white">{capacity.cpu} Cores</span>
-              <span className="text-[10px] text-emerald-400 block font-mono">100% Available</span>
+              <span className="text-[10px] text-emerald-400 block font-mono truncate">{cpuModel}</span>
             </div>
 
             <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-1">
               <div className="flex items-center justify-between text-slate-400 text-xs">
-                <span>Memory</span>
+                <span>Total RAM</span>
                 <Activity size={14} className="text-indigo-400" />
               </div>
-              <span className="text-xl font-bold text-white">{capacity.memory}</span>
-              <span className="text-[10px] text-indigo-300 block font-mono">Dynamic Paged</span>
+              <span className="text-xl font-bold text-white">{totalRAMGB}</span>
+              <span className="text-[10px] text-indigo-300 block font-mono">{capacity.memory}</span>
             </div>
 
             <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-1">
               <div className="flex items-center justify-between text-slate-400 text-xs">
-                <span>Allocated Pods</span>
+                <span>GPU</span>
+                <HardDrive size={14} className="text-amber-400" />
+              </div>
+              <span className="text-xl font-bold text-white">{capacity.gpu || 0}</span>
+              <span className="text-[10px] text-amber-300 block font-mono">
+                {labels["nvidia.com/gpu.present"] === "true" ? "NVIDIA Active" : "Host Integrated"}
+              </span>
+            </div>
+
+            <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-1">
+              <div className="flex items-center justify-between text-slate-400 text-xs">
+                <span>Pods Limit</span>
                 <Box size={14} className="text-emerald-400" />
               </div>
               <span className="text-xl font-bold text-white">{pods.length} / {capacity.pods}</span>
-              <span className="text-[10px] text-cyan-400 block font-mono">Max Capacity 110</span>
+              <span className="text-[10px] text-cyan-400 block font-mono">Max 110 Pods</span>
+            </div>
+          </div>
+
+          {/* Network Bridge & Host Addresses */}
+          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3 text-xs">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Native Host Bridge & Network Topology</span>
+              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Direct Host Routing
+              </span>
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <span className="text-slate-500 block">Host Primary LAN IP</span>
+                <span className="font-mono font-bold text-cyan-300">{lanIP}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Captured Public WAN IP</span>
+                <span className="font-mono font-bold text-indigo-300">{publicIP}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Cluster Pod CIDR</span>
+                <span className="font-mono font-bold text-emerald-400">10.244.0.0/16</span>
+              </div>
             </div>
           </div>
 

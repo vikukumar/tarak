@@ -52,9 +52,11 @@ import (
 	tarakv1 "github.com/vikukumar/tarak/api/tarak/v1"
 	"github.com/vikukumar/tarak/internal/auth"
 	"github.com/vikukumar/tarak/internal/controller"
+	"github.com/vikukumar/tarak/internal/hardware"
 	"github.com/vikukumar/tarak/internal/ingress"
 	"github.com/vikukumar/tarak/internal/loadbalancer"
 	"github.com/vikukumar/tarak/internal/mesh"
+	"github.com/vikukumar/tarak/internal/network"
 	"github.com/vikukumar/tarak/internal/rbac"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/statestore"
@@ -114,6 +116,15 @@ type Config struct {
 	// SANs is the list of additional SANs for the API server certificate.
 	SANs []string
 
+	// CPULimit optionally overrides host CPU allocation (defaults to 100% of host CPU).
+	CPULimit string
+
+	// MemoryLimit optionally overrides host Memory allocation (defaults to 100% of host RAM).
+	MemoryLimit string
+
+	// GPULimit optionally overrides host GPU allocation (defaults to all attached host GPUs).
+	GPULimit string
+
 	// Log is the structured logger.  A production logger is created if nil.
 	Log *zap.Logger
 
@@ -143,6 +154,9 @@ type Server struct {
 	multiMeshMgr    *mesh.MultiMeshManager
 	zeroTrustMgr    *zerotrust.Manager
 	wsHub           *ws.Hub
+	networkDriver   *network.Driver
+	hostInfo        hardware.HostInfo
+	alloc           hardware.ResourceAllocation
 }
 
 // New creates a new Server from the given configuration.
@@ -179,6 +193,14 @@ func New(cfg Config) (*Server, error) {
 	zeroTrustMgr := zerotrust.NewManager(cfg.Log)
 	wsHub := ws.NewHub(cfg.Log)
 
+	hostInfo := hardware.DetectHost()
+	alloc := hardware.ComputeAllocation(hostInfo, cfg.CPULimit, cfg.MemoryLimit, cfg.GPULimit)
+	netDriver := network.NewDriver(network.BridgeConfig{
+		PodCIDR:     "10.244.0.0/16",
+		ServiceCIDR: "10.96.0.0/12",
+		EnablemTLS:  true,
+	}, cfg.Log)
+
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
 		_, err := store.CurrentRevision(context.Background())
@@ -200,6 +222,9 @@ func New(cfg Config) (*Server, error) {
 		multiMeshMgr:    multiMeshMgr,
 		zeroTrustMgr:    zeroTrustMgr,
 		wsHub:           wsHub,
+		networkDriver:   netDriver,
+		hostInfo:        hostInfo,
+		alloc:           alloc,
 	}
 	return s, nil
 }
@@ -207,6 +232,12 @@ func New(cfg Config) (*Server, error) {
 // Run starts the API server and blocks until ctx is cancelled.
 // It returns after graceful shutdown is complete.
 func (s *Server) Run(ctx context.Context) error {
+	// ── Start Host Network Bridge Driver ────────────────────────────────
+	if err := s.networkDriver.Start(ctx); err != nil {
+		s.log.Warn("start network bridge driver", zap.Error(err))
+	}
+	defer s.networkDriver.Stop()
+
 	// ── Bootstrap Core Namespaces & Local Node ───────────────────────────
 	if err := s.bootstrapNamespaces(ctx); err != nil {
 		return fmt.Errorf("bootstrap namespaces: %w", err)
@@ -836,10 +867,9 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 		Resource: "nodes",
 		Name:     hostname,
 	}
-	_, err = s.store.Get(ctx, key)
-	if err == nil {
-		return nil // already exists
-	}
+
+	netInfo := s.networkDriver.GetHostNetworkInfo()
+
 	nodeObj := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Node",
@@ -850,9 +880,16 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 				"kubernetes.io/hostname":                hostname,
 				"node-role.kubernetes.io/control-plane": "",
 				"node-role.kubernetes.io/master":        "",
-				"node.kubernetes.io/instance-type":      "tarak.local",
+				"node.kubernetes.io/instance-type":      "tarak.baremetal",
 				"kubernetes.io/os":                      runtime.GOOS,
 				"kubernetes.io/arch":                    runtime.GOARCH,
+				"tarak.io/cpu-model":                    s.hostInfo.CPUModel,
+				"tarak.io/total-memory-mb":              fmt.Sprintf("%d", s.hostInfo.TotalMemoryMB),
+				"tarak.io/total-memory-gb":              s.hostInfo.TotalMemoryGB,
+				"tarak.io/full-host-allocation":         fmt.Sprintf("%t", s.alloc.IsFullHost),
+				"tarak.io/host-lan-ip":                  netInfo.PrimaryLANIP,
+				"tarak.io/host-public-ip":               netInfo.PublicIP,
+				"nvidia.com/gpu.present":                fmt.Sprintf("%t", s.hostInfo.HasGPU),
 			},
 		},
 		"status": map[string]interface{}{
@@ -862,8 +899,22 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 					"type":    "Ready",
 					"status":  "True",
 					"reason":  "TarakNodeReady",
-					"message": "Tarak control plane and node runtime active",
+					"message": "Tarak control plane and native host bridge active",
 				},
+			},
+			"capacity": map[string]interface{}{
+				"cpu":               s.alloc.CPUCores,
+				"memory":            s.alloc.MemoryMi,
+				"gpu":               s.alloc.GPU,
+				"ephemeral-storage": s.alloc.DiskGi,
+				"pods":              "110",
+			},
+			"allocatable": map[string]interface{}{
+				"cpu":               s.alloc.CPUCores,
+				"memory":            s.alloc.MemoryMi,
+				"gpu":               s.alloc.GPU,
+				"ephemeral-storage": s.alloc.DiskGi,
+				"pods":              "110",
 			},
 			"nodeInfo": map[string]interface{}{
 				"kubeletVersion":          "v1.30.0-tarak",
@@ -874,7 +925,8 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 				"operatingSystem":         runtime.GOOS,
 			},
 			"addresses": []map[string]interface{}{
-				{"type": "InternalIP", "address": "127.0.0.1"},
+				{"type": "InternalIP", "address": netInfo.PrimaryLANIP},
+				{"type": "ExternalIP", "address": netInfo.PublicIP},
 				{"type": "Hostname", "address": hostname},
 			},
 		},
@@ -883,10 +935,32 @@ func (s *Server) bootstrapLocalNode(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// If node exists, update its status capacity & addresses dynamically
+	if existing, err := s.store.Get(ctx, key); err == nil && existing != nil {
+		if _, err := s.store.Update(ctx, key, raw, existing.ResourceVersion); err == nil {
+			s.log.Info("dynamically synced local node hardware and network state",
+				zap.String("node", hostname),
+				zap.String("cpu", s.alloc.CPUCores),
+				zap.String("memory", s.alloc.MemoryMi),
+				zap.String("gpu", s.alloc.GPU),
+				zap.String("lanIP", netInfo.PrimaryLANIP),
+			)
+			return nil
+		}
+	}
+
 	if _, err := s.store.Create(ctx, key, raw); err != nil && !errors.Is(err, statestore.ErrAlreadyExists) {
 		return fmt.Errorf("bootstrap local node: %w", err)
 	}
-	s.log.Info("bootstrapped local node", zap.String("node", hostname))
+	s.log.Info("bootstrapped local node with host hardware capacity",
+		zap.String("node", hostname),
+		zap.String("cpu", s.alloc.CPUCores),
+		zap.String("memory", s.alloc.MemoryMi),
+		zap.String("gpu", s.alloc.GPU),
+		zap.String("lanIP", netInfo.PrimaryLANIP),
+		zap.String("publicIP", netInfo.PublicIP),
+	)
 	return nil
 }
 

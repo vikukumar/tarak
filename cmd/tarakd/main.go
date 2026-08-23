@@ -113,6 +113,9 @@ func newServerCommand() *cobra.Command {
 	f.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error")
 	f.BoolVar(&insecure, "insecure", false, "Allow unauthenticated requests (dev/test only)")
 	f.StringArrayVar(&cfg.SANs, "tls-san", nil, "Additional SANs for the API server TLS certificate")
+	f.StringVar(&cfg.CPULimit, "cpu-limit", "", "CPU cores limit for node allocation (defaults to 100% host CPUs)")
+	f.StringVar(&cfg.MemoryLimit, "memory-limit", "", "Memory limit for node allocation (e.g. 16Gi, defaults to 100% host RAM)")
+	f.StringVar(&cfg.GPULimit, "gpu-limit", "", "GPU limit for node allocation (defaults to all host GPUs)")
 
 	return cmd
 }

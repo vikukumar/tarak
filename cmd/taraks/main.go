@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/vikukumar/tarak/internal/hardware"
+	"github.com/vikukumar/tarak/internal/network"
 	tarakruntime "github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/runtime/tcr"
 	"github.com/vikukumar/tarak/internal/version"
@@ -180,6 +182,11 @@ func newAgentCommand() *cobra.Command {
 }
 
 func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nodeName string, log *zap.Logger) error {
+	hostInfo := hardware.DetectHost()
+	alloc := hardware.ComputeAllocation(hostInfo, "", "", "")
+	netDriver := network.NewDriver(network.BridgeConfig{}, log)
+	netInfo := netDriver.GetHostNetworkInfo()
+
 	nodeObj := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Node",
@@ -190,9 +197,15 @@ func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nod
 				"kubernetes.io/hostname":           nodeName,
 				"node-role.kubernetes.io/worker":   "true",
 				"tarak.io/role":                    "worker",
-				"node.kubernetes.io/instance-type": "tarak.worker",
+				"node.kubernetes.io/instance-type": "tarak.baremetal-worker",
 				"kubernetes.io/os":                 runtime.GOOS,
 				"kubernetes.io/arch":               runtime.GOARCH,
+				"tarak.io/cpu-model":               hostInfo.CPUModel,
+				"tarak.io/total-memory-mb":         fmt.Sprintf("%d", hostInfo.TotalMemoryMB),
+				"tarak.io/total-memory-gb":         hostInfo.TotalMemoryGB,
+				"tarak.io/host-lan-ip":             netInfo.PrimaryLANIP,
+				"tarak.io/host-public-ip":          netInfo.PublicIP,
+				"nvidia.com/gpu.present":           fmt.Sprintf("%t", hostInfo.HasGPU),
 			},
 		},
 		"status": map[string]interface{}{
@@ -202,8 +215,22 @@ func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nod
 					"type":    "Ready",
 					"status":  "True",
 					"reason":  "TarakWorkerReady",
-					"message": "taraks worker agent active and healthy",
+					"message": "taraks worker agent active with native host bridge",
 				},
+			},
+			"capacity": map[string]interface{}{
+				"cpu":               alloc.CPUCores,
+				"memory":            alloc.MemoryMi,
+				"gpu":               alloc.GPU,
+				"ephemeral-storage": alloc.DiskGi,
+				"pods":              "110",
+			},
+			"allocatable": map[string]interface{}{
+				"cpu":               alloc.CPUCores,
+				"memory":            alloc.MemoryMi,
+				"gpu":               alloc.GPU,
+				"ephemeral-storage": alloc.DiskGi,
+				"pods":              "110",
 			},
 			"nodeInfo": map[string]interface{}{
 				"kubeletVersion":          "v" + version.Version + "-tarak",
@@ -211,6 +238,11 @@ func registerWorkerNode(ctx context.Context, client *http.Client, serverURL, nod
 				"architecture":            runtime.GOARCH,
 				"operatingSystem":         runtime.GOOS,
 				"containerRuntimeVersion": "tcr://" + version.Version,
+			},
+			"addresses": []map[string]interface{}{
+				{"type": "InternalIP", "address": netInfo.PrimaryLANIP},
+				{"type": "ExternalIP", "address": netInfo.PublicIP},
+				{"type": "Hostname", "address": nodeName},
 			},
 		},
 	}
