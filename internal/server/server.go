@@ -364,6 +364,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Auth & SSO routes
 	r.Route("/apis/auth.tarak.io/v1", func(r chi.Router) {
+		r.Get("/status", s.ssoManager.HandleStatus)
+		r.Post("/setup", s.ssoManager.HandleSetup)
 		r.Get("/providers", s.ssoManager.HandleListProviders)
 		r.Post("/login", s.ssoManager.HandleLogin)
 		r.Get("/userinfo", s.ssoManager.HandleUserInfo)

@@ -1,8 +1,8 @@
 // Package middleware provides HTTP middleware for the Tarak API server.
 //
 // Authentication middleware implements two mechanisms:
-//   1. X.509 client certificate — CN=username, O=group
-//   2. Bearer token — HMAC-SHA256 signed JWT
+//  1. X.509 client certificate — CN=username, O=group
+//  2. Bearer token — HMAC-SHA256 signed JWT
 //
 // On successful authentication, the user identity is stored in the request context
 // using a typed key, and downstream handlers retrieve it with UserFromContext.
@@ -17,6 +17,7 @@ import (
 	"context"
 	"crypto/x509"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -75,14 +76,23 @@ type AuthOptions struct {
 	AllowInsecure bool
 }
 
-// publicPaths are endpoints accessible without authentication.
-var publicPaths = map[string]bool{
-	"/healthz":   true,
-	"/readyz":    true,
-	"/livez":     true,
-	"/openapi/v2": true,
-	"/api":       true,
-	"/apis":      true,
+// isPublicPath determines if an endpoint can be accessed without prior authentication.
+func isPublicPath(p string) bool {
+	if p == "/healthz" || p == "/readyz" || p == "/livez" || p == "/openapi/v2" || p == "/api" || p == "/apis" || p == "/favicon.ico" {
+		return true
+	}
+	// Embedded UI and assets
+	if p == "/dashboard" || strings.HasPrefix(p, "/dashboard/") || strings.HasPrefix(p, "/assets/") {
+		return true
+	}
+	// Auth, Setup & SSO login endpoints
+	if strings.HasPrefix(p, "/apis/auth.tarak.io/v1/login") ||
+		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/setup") ||
+		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/status") ||
+		strings.HasPrefix(p, "/apis/auth.tarak.io/v1/providers") {
+		return true
+	}
+	return false
 }
 
 // Auth returns an HTTP middleware that authenticates incoming requests.
@@ -98,7 +108,7 @@ func Auth(opts AuthOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Allow public endpoints without auth.
-			if publicPaths[r.URL.Path] {
+			if isPublicPath(r.URL.Path) {
 				r = r.WithContext(WithUser(r.Context(), Anonymous))
 				next.ServeHTTP(w, r)
 				return

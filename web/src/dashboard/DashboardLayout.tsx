@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   GitBranch,
   Layers,
@@ -11,6 +11,9 @@ import {
   CheckCircle2,
   Search,
   Filter,
+  LogOut,
+  User,
+  Shield,
   LucideIcon
 } from 'lucide-react';
 import { AppTopologyView } from './AppTopologyView';
@@ -20,23 +23,79 @@ import { HubbleVisualizer } from './HubbleVisualizer';
 import { RbacMatrix } from './RbacMatrix';
 import { SsoSecurity } from './SsoSecurity';
 import { MeshManager } from './MeshManager';
+import { AuthPortal } from './AuthPortal';
+import { ErrorPage } from './ErrorPages';
+
+// Setup global fetch interceptor to attach Bearer token
+if (typeof window !== 'undefined') {
+  const origFetch = window.fetch;
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const token = localStorage.getItem('tarak_token');
+    const headers = new Headers(init?.headers || {});
+    if (token && typeof input === 'string' && input.startsWith('/')) {
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+    return origFetch(input, { ...init, headers });
+  };
+}
 
 interface Props {
   onToast: (msg: string) => void;
 }
 
 export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('tarak_token') : null;
+  });
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    return { username: 'admin', roles: ['cluster-admin', 'system:masters'] };
+  });
   const [activeSubTab, setActiveSubTab] = useState<'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso'>('topology');
   const [namespace, setNamespace] = useState<string>('default');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentErrorCode, setCurrentErrorCode] = useState<401 | 403 | 404 | 500 | null>(null);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
       setIsRefreshing(false);
-      onToast('Cluster state refreshed');
+      onToast('Cluster state synced');
     }, 600);
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('tarak_token');
+    setAuthToken(null);
+    onToast('Logged out of cluster');
+  };
+
+  // If unauthenticated, show First-Time Setup Wizard or Login Portal
+  if (!authToken) {
+    return (
+      <AuthPortal
+        onAuthenticated={(user, token) => {
+          setAuthToken(token);
+          setCurrentUser(user);
+        }}
+        onToast={onToast}
+      />
+    );
+  }
+
+  // If a custom error state is active, render the dedicated error page
+  if (currentErrorCode) {
+    return (
+      <div style={{ maxWidth: 1280, margin: '2rem auto', padding: '0 1rem' }}>
+        <ErrorPage
+          code={currentErrorCode}
+          onAction={() => setCurrentErrorCode(null)}
+          actionText="Return to Cluster Dashboard"
+        />
+      </div>
+    );
+  }
 
   interface NavItem {
     id: 'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso';
@@ -93,13 +152,13 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
                 cursor: 'pointer'
               }}
             >
-              <option value="all" style={{ background: '#0f172a' }}>All Namespaces</option>
               <option value="default" style={{ background: '#0f172a' }}>default</option>
               <option value="tarak-system" style={{ background: '#0f172a' }}>tarak-system</option>
               <option value="tarak-public" style={{ background: '#0f172a' }}>tarak-public</option>
             </select>
           </div>
 
+          {/* Sync Button */}
           <button
             onClick={handleRefresh}
             style={{
@@ -119,6 +178,39 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
             <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} />
             <span>Sync</span>
           </button>
+
+          {/* Super-Admin User Pill & Logout */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'rgba(15, 23, 42, 0.8)',
+            border: '1px solid var(--border-glass)',
+            padding: '0.25rem 0.75rem',
+            borderRadius: 8
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Shield size={14} color="var(--accent-green)" />
+              <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
+                {currentUser?.username || 'Super-Admin'}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '2px'
+              }}
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -139,17 +231,17 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
               key={item.id}
               onClick={() => setActiveSubTab(item.id)}
               style={{
-                background: isActive ? 'rgba(0, 240, 255, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                background: isActive ? 'rgba(0, 240, 255, 0.12)' : 'rgba(15, 23, 42, 0.4)',
                 color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                 border: isActive ? '1px solid rgba(0, 240, 255, 0.4)' : '1px solid var(--border-glass)',
-                padding: '0.65rem 1.1rem',
-                borderRadius: 10,
+                borderRadius: 8,
+                padding: '0.55rem 1rem',
                 fontSize: '0.88rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: 8,
                 whiteSpace: 'nowrap',
                 transition: 'all 0.2s ease'
               }}
@@ -158,7 +250,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
               <span>{item.label}</span>
               {item.badge && (
                 <span style={{
-                  background: 'var(--accent-cyan)',
+                  background: item.badge === 'Realtime' ? 'var(--accent-pink)' : (item.badge === 'Multi-Mesh' ? 'var(--accent-purple)' : 'var(--accent-green)'),
                   color: '#000',
                   fontSize: '0.65rem',
                   fontWeight: 800,

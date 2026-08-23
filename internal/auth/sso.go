@@ -56,12 +56,15 @@ type SessionToken struct {
 
 // Manager handles multi-provider SSO and cluster session tokens.
 type Manager struct {
-	mu        sync.RWMutex
-	providers map[string]*SSOProvider
-	sessions  map[string]*UserProfile
-	tokens    map[string]*SessionToken
-	jwtSecret []byte
-	log       *zap.Logger
+	mu            sync.RWMutex
+	providers     map[string]*SSOProvider
+	sessions      map[string]*UserProfile
+	tokens        map[string]*SessionToken
+	jwtSecret     []byte
+	hasSuperAdmin bool
+	adminUser     string
+	adminPass     string
+	log           *zap.Logger
 }
 
 // NewManager creates a new SSO and Token manager.
@@ -70,11 +73,14 @@ func NewManager(jwtSecret []byte, log *zap.Logger) *Manager {
 		jwtSecret = []byte("tarak-default-cluster-jwt-secret-key-32b")
 	}
 	m := &Manager{
-		providers: make(map[string]*SSOProvider),
-		sessions:  make(map[string]*UserProfile),
-		tokens:    make(map[string]*SessionToken),
-		jwtSecret: jwtSecret,
-		log:       log.Named("sso-manager"),
+		providers:     make(map[string]*SSOProvider),
+		sessions:      make(map[string]*UserProfile),
+		tokens:        make(map[string]*SessionToken),
+		jwtSecret:     jwtSecret,
+		hasSuperAdmin: false,
+		adminUser:     "admin",
+		adminPass:     "admin",
+		log:           log.Named("sso-manager"),
 	}
 
 	m.seedDefaultProviders()
@@ -219,10 +225,73 @@ func (m *Manager) HandleListProviders(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleStatus returns the cluster authentication and setup readiness state.
+func (m *Manager) HandleStatus(w http.ResponseWriter, r *http.Request) {
+	m.mu.RLock()
+	setupReq := !m.hasSuperAdmin
+	m.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"setupRequired": setupReq,
+		"clusterName":   "tarak-cluster",
+		"authModes":     []string{"password", "token", "mtls", "sso"},
+		"version":       "v1.0.6",
+	})
+}
+
+// HandleSetup performs first-time Super Admin account creation.
+func (m *Manager) HandleSetup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid setup payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, `{"error":"username and password required"}`, http.StatusBadRequest)
+		return
+	}
+
+	m.mu.Lock()
+	m.adminUser = req.Username
+	m.adminPass = req.Password
+	m.hasSuperAdmin = true
+	m.mu.Unlock()
+
+	groups := []string{"system:authenticated", "system:masters"}
+	roles := []string{"cluster-admin"}
+
+	tok, err := m.IssueToken(req.Username, "initial-setup", groups, roles, 7*24*time.Hour)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "Super-Admin account initialized successfully",
+		"token":     tok.Token,
+		"expiresAt": tok.ExpiresAt,
+		"user": map[string]interface{}{
+			"username": req.Username,
+			"roles":    roles,
+			"groups":   groups,
+		},
+	})
+}
+
 func (m *Manager) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Token    string `json:"token"`
 		Provider string `json:"provider"`
 	}
 
@@ -231,11 +300,22 @@ func (m *Manager) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	m.mu.RLock()
+	expectedUser := m.adminUser
+	expectedPass := m.adminPass
+	m.mu.RUnlock()
+
 	if req.Username == "" {
 		req.Username = "admin"
 	}
 	if req.Provider == "" {
 		req.Provider = "local"
+	}
+
+	// Validate credentials
+	if req.Password != "" && req.Password != expectedPass && expectedPass != "" && req.Username == expectedUser {
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		return
 	}
 
 	groups := []string{"system:authenticated", "system:masters"}
