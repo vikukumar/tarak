@@ -133,6 +133,25 @@ func (m *MultiMeshManager) HandleListMeshes(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// HandleGetMesh returns a single mesh by name.
+func (m *MultiMeshManager) HandleGetMesh(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if name == "" {
+		name = chi.URLParam(r, "mesh")
+	}
+	m.mu.RLock()
+	mesh, ok := m.meshes[name]
+	m.mu.RUnlock()
+
+	if !ok {
+		http.Error(w, fmt.Sprintf("mesh %q not found", name), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(mesh)
+}
+
 // HandleCreateMesh creates a new mesh tenant.
 func (m *MultiMeshManager) HandleCreateMesh(w http.ResponseWriter, r *http.Request) {
 	var req Mesh

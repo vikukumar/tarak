@@ -54,11 +54,45 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
   });
   const [activeSubTab, setActiveSubTab] = useState<'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso'>('topology');
   const [namespace, setNamespace] = useState<string>('default');
+  const [namespaces, setNamespaces] = useState<string[]>(['default', 'tarak-system', 'tarak-public']);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentErrorCode, setCurrentErrorCode] = useState<401 | 403 | 404 | 500 | null>(null);
 
+  const fetchNamespaces = async () => {
+    try {
+      const res = await fetch('/api/v1/namespaces');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items && Array.isArray(data.items)) {
+          const names = data.items.map((it: any) => it.metadata?.name).filter(Boolean);
+          if (names.length > 0) {
+            setNamespaces(names);
+          }
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      if (pathParts.length > 1 && ['topology', 'workloads', 'exec', 'mesh', 'hubble', 'rbac', 'sso'].includes(pathParts[1])) {
+        setActiveSubTab(pathParts[1] as any);
+      }
+    }
+    fetchNamespaces();
+  }, []);
+
+  const handleSubTabChange = (tabId: 'topology' | 'workloads' | 'exec' | 'mesh' | 'hubble' | 'rbac' | 'sso') => {
+    setActiveSubTab(tabId);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', `/dashboard/${tabId}`);
+    }
+  };
+
   const handleRefresh = () => {
     setIsRefreshing(true);
+    fetchNamespaces();
     setTimeout(() => {
       setIsRefreshing(false);
       onToast('Cluster state synced');
@@ -137,7 +171,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Namespace Filter */}
+          {/* Dynamic Namespace Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.75rem', borderRadius: 8, border: '1px solid var(--border-glass)' }}>
             <Filter size={14} color="var(--text-muted)" />
             <select
@@ -152,9 +186,11 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
                 cursor: 'pointer'
               }}
             >
-              <option value="default" style={{ background: '#0f172a' }}>default</option>
-              <option value="tarak-system" style={{ background: '#0f172a' }}>tarak-system</option>
-              <option value="tarak-public" style={{ background: '#0f172a' }}>tarak-public</option>
+              {namespaces.map(ns => (
+                <option key={ns} value={ns} style={{ background: '#0f172a', color: '#fff' }}>
+                  {ns}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -229,7 +265,7 @@ export const DashboardLayout: React.FC<Props> = ({ onToast }) => {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveSubTab(item.id)}
+              onClick={() => handleSubTabChange(item.id)}
               style={{
                 background: isActive ? 'rgba(0, 240, 255, 0.12)' : 'rgba(15, 23, 42, 0.4)',
                 color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',

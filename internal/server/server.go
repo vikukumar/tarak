@@ -396,6 +396,9 @@ func (s *Server) Run(ctx context.Context) error {
 	r.Route("/apis/mesh.tarak.io/v1", func(r chi.Router) {
 		r.Get("/meshes", s.multiMeshMgr.HandleListMeshes)
 		r.Post("/meshes", s.multiMeshMgr.HandleCreateMesh)
+		r.Get("/meshes/{name}", s.multiMeshMgr.HandleGetMesh)
+		r.Get("/namespaces/{namespace}/meshes", s.multiMeshMgr.HandleListMeshes)
+		r.Get("/namespaces/{namespace}/meshes/{name}", s.multiMeshMgr.HandleGetMesh)
 		r.Get("/meshes/{mesh}/services", s.multiMeshMgr.HandleListServices)
 		r.Get("/meshes/{mesh}/external-services", s.multiMeshMgr.HandleListExternalServices)
 		r.Get("/meshes/{mesh}/traffic-permissions", s.multiMeshMgr.HandleListTrafficPermissions)

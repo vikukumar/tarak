@@ -1895,22 +1895,29 @@ func buildURL(base, resource, namespace, name string) string {
 		"customresourcedefinitions": "apiextensions.k8s.io/v1",
 		"taraksecuritypolicies":     "security.tarak.io/v1",
 		"tarakapplications":         "apps.tarak.io/v1",
+		"meshes":                    "mesh.tarak.io/v1",
+		"meshservices":              "mesh.tarak.io/v1",
+		"meshexternalservices":      "mesh.tarak.io/v1",
+		"meshtrafficpermissions":    "mesh.tarak.io/v1",
+		"meshpassthroughpolicies":   "mesh.tarak.io/v1",
+		"meshproxypatches":          "mesh.tarak.io/v1",
 	}
 
 	short := map[string]string{
-		"po": "pods", "svc": "services", "cm": "configmaps",
-		"sa": "serviceaccounts", "ns": "namespaces", "no": "nodes",
-		"pv": "persistentvolumes", "pvc": "persistentvolumeclaims",
-		"ev": "events", "rc": "replicationcontrollers",
-		"deploy": "deployments", "rs": "replicasets",
-		"sts": "statefulsets", "ds": "daemonsets",
-		"cj": "cronjobs",
-		"netpol": "networkpolicies", "ing": "ingresses",
-		"cr": "clusterroles", "crb": "clusterrolebindings",
-		"sc": "storageclasses", "sec": "secrets",
+		"po": "pods", "pod": "pods", "svc": "services", "service": "services", "cm": "configmaps", "configmap": "configmaps",
+		"sa": "serviceaccounts", "serviceaccount": "serviceaccounts", "ns": "namespaces", "namespace": "namespaces", "no": "nodes", "node": "nodes",
+		"pv": "persistentvolumes", "persistentvolume": "persistentvolumes", "pvc": "persistentvolumeclaims", "persistentvolumeclaim": "persistentvolumeclaims",
+		"ev": "events", "event": "events", "rc": "replicationcontrollers", "replicationcontroller": "replicationcontrollers",
+		"deploy": "deployments", "deployment": "deployments", "rs": "replicasets", "replicaset": "replicasets",
+		"sts": "statefulsets", "statefulset": "statefulsets", "ds": "daemonsets", "daemonset": "daemonsets",
+		"cj": "cronjobs", "cronjob": "cronjobs", "job": "jobs",
+		"netpol": "networkpolicies", "networkpolicy": "networkpolicies", "ing": "ingresses", "ingress": "ingresses",
+		"cr": "clusterroles", "clusterrole": "clusterroles", "crb": "clusterrolebindings", "clusterrolebinding": "clusterrolebindings",
+		"sc": "storageclasses", "storageclass": "storageclasses", "sec": "secrets", "secret": "secrets",
 		"crd": "customresourcedefinitions", "crds": "customresourcedefinitions",
 		"tsp": "taraksecuritypolicies", "securitypolicy": "taraksecuritypolicies",
 		"tapp": "tarakapplications", "tarakapp": "tarakapplications", "app": "tarakapplications",
+		"mesh": "meshes", "meshes": "meshes",
 	}
 	if full, ok := short[strings.ToLower(resource)]; ok {
 		resource = full
@@ -1923,6 +1930,7 @@ func buildURL(base, resource, namespace, name string) string {
 		"ingressclasses": true, "clusterroles": true, "clusterrolebindings": true,
 		"storageclasses": true, "volumeattachments": true, "csinodes": true,
 		"customresourcedefinitions": true, "taraksecuritypolicies": true,
+		"meshes": true,
 	}
 
 	var path string
@@ -2727,6 +2735,48 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 			}
 			_ = json.Unmarshal(raw, &crd)
 			fmt.Fprintf(w, "%s\t%s\n", crd.Metadata.Name, crd.Metadata.CreationTimestamp.Format(time.RFC3339))
+		}
+
+	case "meshes":
+		if !noHeaders {
+			fmt.Fprintf(w, "NAME\tPHASE\tMTLS MODE\tPASSTHROUGH\tSERVICES\tENROLLED PODS\tAGE\n")
+		}
+		for _, raw := range items {
+			var m struct {
+				Metadata struct {
+					Name              string    `json:"name"`
+					CreationTimestamp time.Time `json:"creationTimestamp"`
+				} `json:"metadata"`
+				Spec struct {
+					MTLS struct {
+						Mode string `json:"mode"`
+					} `json:"mtls"`
+					Networking struct {
+						PassthroughMode string `json:"passthroughMode"`
+					} `json:"networking"`
+				} `json:"spec"`
+				Status struct {
+					Phase         string `json:"phase"`
+					TotalServices int    `json:"totalServices"`
+					EnrolledPods  int    `json:"enrolledPods"`
+				} `json:"status"`
+			}
+			_ = json.Unmarshal(raw, &m)
+			mtlsMode := m.Spec.MTLS.Mode
+			if mtlsMode == "" {
+				mtlsMode = "Strict"
+			}
+			passMode := m.Spec.Networking.PassthroughMode
+			if passMode == "" {
+				passMode = "Passthrough"
+			}
+			phase := m.Status.Phase
+			if phase == "" {
+				phase = "Active"
+			}
+			age := formatAge(time.Since(m.Metadata.CreationTimestamp))
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
+				m.Metadata.Name, phase, mtlsMode, passMode, m.Status.TotalServices, m.Status.EnrolledPods, age)
 		}
 
 	default:
