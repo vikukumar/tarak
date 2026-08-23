@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Terminal as TerminalIcon, Send, RefreshCw, Layers, Box, Trash2, Maximize2 } from "lucide-react";
+import { Terminal as TerminalIcon, Send, RefreshCw, Layers, Box, Trash2, Shield, User, CornerDownLeft } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -13,9 +13,10 @@ export default function WebTerminalPage() {
   const [pods, setPods] = useState<any[]>([]);
   const [selectedPod, setSelectedPod] = useState<string>("");
   const [selectedContainer, setSelectedContainer] = useState<string>("");
+  const [execUser, setExecUser] = useState<"root" | "non-root">("root");
   const [history, setHistory] = useState<Array<{ type: "cmd" | "out" | "err" | "info"; text: string }>>([
-    { type: "info", text: "Connected to Tarak Container Runtime Engine (TCR)." },
-    { type: "info", text: "Session authenticated. Type any command (e.g. ls, env, ps, uname -a) and press Enter." },
+    { type: "info", text: "Connected to Tarak Container Runtime Engine (TCR) POSIX Shell." },
+    { type: "info", text: "Session authenticated. Type standard Linux commands (e.g. ls -la, ps aux, pwd, env, uname -a, cat /etc/hosts) and press Enter." },
   ]);
   const [inputLine, setInputLine] = useState("");
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -62,11 +63,22 @@ export default function WebTerminalPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
 
+  const promptSymbol = execUser === "root" ? "#" : "$";
+  const userName = execUser === "root" ? "root" : "appuser";
+  const promptText = `${userName}@${selectedPod || "pod"}:/${promptSymbol}`;
+
   const runCommand = async (cmdToRun: string) => {
     if (!cmdToRun.trim() || !selectedPod) return;
     const cmd = cmdToRun.trim();
 
-    setHistory((prev) => [...prev, { type: "cmd", text: `root@${selectedPod}:/# ${cmd}` }]);
+    if (cmd === "clear" || cmd === "cls") {
+      setHistory([
+        { type: "info", text: `Terminal session cleared. Active: ${userName}@${selectedPod} [${selectedContainer || "main"}]` },
+      ]);
+      return;
+    }
+
+    setHistory((prev) => [...prev, { type: "cmd", text: `${promptText} ${cmd}` }]);
     setCommandHistory((prev) => [...prev, cmd]);
     setHistoryIndex(-1);
     setIsExecuting(true);
@@ -83,6 +95,8 @@ export default function WebTerminalPage() {
           body: JSON.stringify({
             command: cmd.split(" "),
             container: selectedContainer,
+            user: userName,
+            tty: true,
           }),
         }
       );
@@ -144,18 +158,16 @@ export default function WebTerminalPage() {
   const containerList = currentPodObj?.spec?.containers || [];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2.5">
             <TerminalIcon size={24} className="text-cyan-400" />
-            <span>Interactive Web Exec Terminal</span>
+            <span>Interactive Container Web Terminal</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Direct pseudo-terminal execution inside running container processes in{" "}
-            <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-              {selectedNamespace === "_all" ? "All Namespaces" : selectedNamespace}
-            </span>
+            Direct pseudo-terminal execution and live POSIX shell inside running container processes.
           </p>
         </div>
 
@@ -183,7 +195,7 @@ export default function WebTerminalPage() {
           )}
 
           {/* Container Selector */}
-          {containerList.length > 1 && (
+          {containerList.length > 0 && (
             <div className="flex items-center gap-2 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-lg text-xs">
               <Layers size={14} className="text-purple-400" />
               <select
@@ -199,6 +211,30 @@ export default function WebTerminalPage() {
               </select>
             </div>
           )}
+
+          {/* User Mode (Root / Non-Root) Toggle */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-white/10 p-1 rounded-lg text-xs font-mono">
+            <button
+              onClick={() => setExecUser("root")}
+              className={`px-2 py-0.5 rounded transition-all ${
+                execUser === "root"
+                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              root (uid 0)
+            </button>
+            <button
+              onClick={() => setExecUser("non-root")}
+              className={`px-2 py-0.5 rounded transition-all ${
+                execUser === "non-root"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              appuser (uid 1000)
+            </button>
+          </div>
 
           <Button
             variant="secondary"
@@ -218,8 +254,8 @@ export default function WebTerminalPage() {
 
       {/* Shortcut Badges */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-slate-400">Quick commands:</span>
-        {["ls -la", "ps aux", "env", "uname -a", "df -h", "uptime"].map((sc) => (
+        <span className="text-slate-400 font-mono">Quick POSIX commands:</span>
+        {["ls -la", "pwd", "ps aux", "uptime", "uname -a", "whoami", "id", "cat /etc/hosts", "cat /etc/os-release", "env"].map((sc) => (
           <button
             key={sc}
             onClick={() => runCommand(sc)}
@@ -238,16 +274,17 @@ export default function WebTerminalPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-            <span className="ml-2 text-slate-300 font-bold">
-              root@{selectedPod || "pod"}:/#
-            </span>
+            <span className="ml-2 text-slate-300 font-bold">{promptText}</span>
             {selectedContainer && (
-              <Badge variant="purple" className="text-[10px] py-0 px-2">
-                {selectedContainer}
+              <Badge variant="purple" className="text-[10px] py-0 px-2 font-mono">
+                container: {selectedContainer}
               </Badge>
             )}
+            <Badge variant={execUser === "root" ? "rose" : "emerald"} className="text-[10px] py-0 px-2 font-mono">
+              user: {userName}
+            </Badge>
           </div>
-          <span className="text-cyan-400 font-semibold text-[11px]">TCR Shell Active</span>
+          <span className="text-cyan-400 font-semibold text-[11px]">TCR POSIX Shell Active</span>
         </div>
 
         {/* Output Stream */}
@@ -280,7 +317,7 @@ export default function WebTerminalPage() {
           className="p-3 bg-slate-950/90 border-t border-white/10 flex items-center gap-3 font-mono text-xs"
         >
           <span className="text-cyan-400 font-bold flex-shrink-0">
-            root@{selectedPod || "pod"}:/#
+            {promptText}
           </span>
           <input
             ref={inputRef}
@@ -294,7 +331,7 @@ export default function WebTerminalPage() {
                 ? "No pod available in selected namespace..."
                 : isExecuting
                 ? "Executing..."
-                : "Type container command here..."
+                : "Type container command here (e.g. ls -la, ps aux, cat /etc/hosts)..."
             }
             className="flex-1 bg-transparent text-white placeholder:text-slate-600 outline-none"
             autoFocus
@@ -303,9 +340,9 @@ export default function WebTerminalPage() {
             type="submit"
             size="sm"
             disabled={isExecuting || !inputLine.trim() || !selectedPod}
-            className="px-3"
+            className="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1"
           >
-            <Send size={12} />
+            <Send size={12} className="mr-1" /> Run
           </Button>
         </form>
       </Card>

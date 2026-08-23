@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -203,13 +204,31 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 		}
 
 		unwrapped := unwrapContainerCommand(cfg.Command)
+		var extraEnvs []string
+
+		// Check package.json for start script and inline environment variables (like NODE_PATH=. or PORT=8080)
+		pkgDir := workDir
+		if !fileExistsIn(pkgDir, "package.json") && fileExistsIn(cfg.Rootfs, "package.json") {
+			pkgDir = cfg.Rootfs
+		}
+		if scriptCmd, envs, ok := parsePackageJSONStart(pkgDir); ok {
+			extraEnvs = append(extraEnvs, envs...)
+			if len(unwrapped) == 0 || (len(unwrapped) > 0 && (unwrapped[0] == "npm" || unwrapped[0] == "yarn" || unwrapped[0] == "pnpm")) {
+				unwrapped = strings.Fields(scriptCmd)
+			}
+		}
+
+		envMerged := append(cfg.Env, extraEnvs...)
+
 		if len(unwrapped) > 0 {
 			first := strings.ToLower(filepath.Base(unwrapped[0]))
 			first = strings.TrimSuffix(first, ".cmd")
 			first = strings.TrimSuffix(first, ".exe")
 
-			// Check for npm, yarn, pnpm runners
-			if first == "npm" || first == "yarn" || first == "pnpm" || first == "npx" {
+			// Check for direct node execution
+			if first == "node" || first == "nodejs" {
+				unwrapped = unwrapped[1:]
+			} else if first == "npm" || first == "yarn" || first == "pnpm" || first == "npx" {
 				var runnerBin string
 				var err error
 				for _, name := range []string{first, first + ".cmd", first + ".exe", first + ".bat"} {
@@ -220,21 +239,16 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 				}
 				if runnerBin != "" {
 					logStartup(fmt.Sprintf("running Node.js container with host %s binary (%s %s)", first, runnerBin, strings.Join(unwrapped[1:], " ")))
-					return startNativeProcess(ctx, cfg.ID, runnerBin, unwrapped[1:], cfg.Env, workDir, logFile)
+					return startNativeProcess(ctx, cfg.ID, runnerBin, unwrapped[1:], envMerged, workDir, logFile)
 				}
 				_ = err
-			}
-
-			// Check for direct node execution
-			if first == "node" || first == "nodejs" {
-				unwrapped = unwrapped[1:]
 			}
 		}
 
 		if nodeBin, err := exec.LookPath("node"); err == nil {
 			nodeArgs := unwrapped
 			if len(nodeArgs) == 0 {
-				for _, candidate := range []string{"server.js", "index.js", "app.js", "main.js", "dist/index.js", "src/index.js"} {
+				for _, candidate := range []string{"src/server.js", "src/index.js", "src/app.js", "server.js", "index.js", "app.js", "main.js", "dist/index.js"} {
 					if fileExistsIn(workDir, candidate) {
 						nodeArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
 						break
@@ -255,7 +269,7 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			}
 			if len(nodeArgs) > 0 {
 				logStartup(fmt.Sprintf("running Node.js container with host node binary (%s %s)", nodeBin, strings.Join(nodeArgs, " ")))
-				return startNativeProcess(ctx, cfg.ID, nodeBin, nodeArgs, cfg.Env, workDir, logFile)
+				return startNativeProcess(ctx, cfg.ID, nodeBin, nodeArgs, envMerged, workDir, logFile)
 			}
 		}
 		webRoot := FindWebRoot(cfg.Rootfs, imgType)
@@ -751,4 +765,49 @@ func unwrapContainerCommand(cmd []string) []string {
 		break
 	}
 	return out
+}
+
+// parsePackageJSONStart inspects package.json for start script and extracts inline environment variables
+func parsePackageJSONStart(dir string) (string, []string, bool) {
+	pkgPath := filepath.Join(dir, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return "", nil, false
+	}
+	var pkg struct {
+		Main    string            `json:"main"`
+		Scripts map[string]string `json:"scripts"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return "", nil, false
+	}
+	startScript := ""
+	if pkg.Scripts != nil {
+		startScript = pkg.Scripts["start"]
+	}
+	if startScript == "" && pkg.Main != "" {
+		startScript = "node " + pkg.Main
+	}
+	if startScript == "" {
+		return "", nil, false
+	}
+
+	var extraEnvs []string
+	parts := strings.Fields(startScript)
+	for len(parts) > 0 {
+		if strings.Contains(parts[0], "=") && !strings.HasPrefix(parts[0], "-") && !strings.HasPrefix(parts[0], "/") && !strings.HasPrefix(parts[0], ".") {
+			kv := strings.SplitN(parts[0], "=", 2)
+			if len(kv) == 2 {
+				val := kv[1]
+				if kv[0] == "NODE_PATH" && (val == "." || val == "./") {
+					val = dir
+				}
+				extraEnvs = append(extraEnvs, kv[0]+"="+val)
+				parts = parts[1:]
+				continue
+			}
+		}
+		break
+	}
+	return strings.Join(parts, " "), extraEnvs, true
 }

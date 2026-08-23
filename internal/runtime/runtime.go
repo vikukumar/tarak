@@ -65,6 +65,8 @@ type ContainerInfo struct {
 	LogFilePath  string            `json:"logFilePath,omitempty"`
 	DockerID     string            `json:"dockerID,omitempty"`
 	SandboxPID   int               `json:"sandboxPid,omitempty"`
+	Rootfs       string            `json:"rootfs,omitempty"`
+	WorkDir      string            `json:"workDir,omitempty"`
 }
 
 // ContainerPort represents an exposed port on a container.
@@ -543,6 +545,8 @@ func (e *Engine) runContainerViaTCR(ctx context.Context, spec PodRuntimeSpec, cS
 	info.Ready = true
 	info.SandboxPID = proc.PID
 	info.DockerID = fmt.Sprintf("tcr-%d", proc.PID)
+	info.Rootfs = rootfs
+	info.WorkDir = workDir
 
 	// For TCR containers, port forwarding is via host network.
 	// Set HostPort = ContainerPort (container binds the port on the host directly).
@@ -905,14 +909,19 @@ func (e *Engine) GetLogs(ctx context.Context, ns, podName, containerName string,
 // ExecCommand executes a command inside the container.
 func (e *Engine) ExecCommand(ctx context.Context, ns, podName, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) (int, error) {
 	e.mu.RLock()
+	var targetInfo *ContainerInfo
 	if containerName == "" {
 		prefix := fmt.Sprintf("%s/%s/", ns, podName)
 		for key, info := range e.containers {
 			if strings.HasPrefix(key, prefix) {
 				containerName = info.Name
+				targetInfo = info
 				break
 			}
 		}
+	} else {
+		key := fmt.Sprintf("%s/%s/%s", ns, podName, containerName)
+		targetInfo = e.containers[key]
 	}
 	e.mu.RUnlock()
 
@@ -946,29 +955,8 @@ func (e *Engine) ExecCommand(ctx context.Context, ns, podName, containerName str
 		}
 	}
 
-	// High-Fidelity Sandbox / Local Execution
-	cmdStr := strings.Join(cmd, " ")
-
-	// Try executing system command locally if available
-	var localCmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		comspec := os.Getenv("COMSPEC")
-		if comspec == "" {
-			comspec = "C:\\Windows\\System32\\cmd.exe"
-		}
-		localCmd = exec.CommandContext(ctx, comspec, "/c", cmdStr)
-	} else {
-		localCmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
-	}
-	localCmd.Stdin = stdin
-	localCmd.Stdout = stdout
-	localCmd.Stderr = stderr
-	err := localCmd.Run()
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "command execution failed: %v\n", err)
-		return -1, err
-	}
-	return 0, nil
+	// High-Fidelity POSIX Container Shell Engine
+	return ExecuteContainerShell(ctx, targetInfo, ns, podName, containerName, cmd, stdin, stdout, stderr, tty, "root")
 }
 
 // ─── Port Forwarding ──────────────────────────────────────────────────────────

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ func (s *Server) HandlePodExec(w http.ResponseWriter, r *http.Request) {
 		Command   []string `json:"command"`
 		Container string   `json:"container"`
 		TTY       bool     `json:"tty"`
+		User      string   `json:"user"`
 	}
 
 	if r.Header.Get("Content-Type") == "application/json" {
@@ -54,7 +54,7 @@ func (s *Server) HandlePodExec(w http.ResponseWriter, r *http.Request) {
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
 
-	exitCode, err := s.runtime.ExecCommand(
+	exitCode, _ := s.runtime.ExecCommand(
 		r.Context(),
 		ns,
 		name,
@@ -69,37 +69,7 @@ func (s *Server) HandlePodExec(w http.ResponseWriter, r *http.Request) {
 	outStr := stdoutBuf.String()
 	errStr := stderrBuf.String()
 
-	// If runtime exec failed or container was executed via host fallback, run local shell in safe sandbox
-	if err != nil && outStr == "" && errStr == "" {
-		var localCmd *exec.Cmd
-		if len(req.Command) == 1 {
-			localCmd = exec.Command("cmd", "/C", req.Command[0])
-			var out []byte
-			var execErr error
-			out, execErr = localCmd.CombinedOutput()
-			if execErr != nil {
-				localCmd = exec.Command("sh", "-c", req.Command[0])
-				out, execErr = localCmd.CombinedOutput()
-			}
-			outStr = string(out)
-			if execErr != nil {
-				exitCode = 1
-			} else {
-				exitCode = 0
-			}
-		} else {
-			localCmd = exec.Command(req.Command[0], req.Command[1:]...)
-			out, execErr := localCmd.CombinedOutput()
-			outStr = string(out)
-			if execErr != nil {
-				exitCode = 1
-			} else {
-				exitCode = 0
-			}
-		}
-	}
-
-	if outStr == "" && errStr == "" {
+	if outStr == "" && errStr == "" && exitCode == 0 {
 		outStr = fmt.Sprintf("[%s] Container %s in pod %s/%s running. Process executed.",
 			time.Now().Format("15:04:05"), containerName, ns, name)
 	}
