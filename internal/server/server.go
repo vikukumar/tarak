@@ -172,6 +172,14 @@ func New(cfg Config) (*Server, error) {
 	}
 	applyDefaults(&cfg)
 
+	// ── Ensure directories exist ─────────────────────────────────────────
+	if cfg.DataDir != "" {
+		_ = os.MkdirAll(cfg.DataDir, 0750)
+	}
+	if cfg.StateStorePath != "" {
+		_ = os.MkdirAll(filepath.Dir(cfg.StateStorePath), 0750)
+	}
+
 	// ── State store ──────────────────────────────────────────────────────
 	store, err := statestore.Open(statestore.Options{
 		Path:   cfg.StateStorePath,
