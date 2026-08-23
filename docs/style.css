@@ -107,31 +107,20 @@ header {
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   text-decoration: none;
-  color: var(--text-primary);
-  font-weight: 800;
-  font-size: 1.35rem;
-  letter-spacing: 0.5px;
   z-index: 1001;
 }
 
 .logo-container img {
-  height: 38px;
-  width: 38px;
-  border-radius: 10px;
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+  height: 40px;
+  width: auto;
+  max-width: 170px;
+  object-fit: contain;
   transition: transform 0.3s ease;
 }
 
 .logo-container:hover img {
-  transform: rotate(5deg) scale(1.08);
-}
-
-.logo-text-gradient {
-  background: var(--grad-cyan-purple);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  transform: scale(1.04);
 }
 
 /* Desktop Navigation */
