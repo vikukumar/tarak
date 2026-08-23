@@ -8,7 +8,8 @@ export type BadgeVariant =
   | "rose"
   | "indigo"
   | "purple"
-  | "muted";
+  | "muted"
+  | "slate";
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -30,6 +31,7 @@ export const Badge: React.FC<BadgeProps> = ({
     indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
     purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
     muted: "bg-slate-800/60 text-slate-300 border-white/10",
+    slate: "bg-slate-800/60 text-slate-300 border-slate-700/50",
   };
 
   const dotStyles: Record<BadgeVariant, string> = {
@@ -40,6 +42,7 @@ export const Badge: React.FC<BadgeProps> = ({
     indigo: "bg-indigo-400 shadow-[0_0_8px_#6366f1]",
     purple: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
     muted: "bg-slate-400",
+    slate: "bg-slate-400",
   };
 
   return (
