@@ -3,7 +3,9 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -86,9 +88,47 @@ func ProbeHostRuntimes(log *zap.Logger) HostRuntimeReport {
 	}
 }
 
+func findRuntimeBinary(binary string) string {
+	if binPath, err := exec.LookPath(binary); err == nil {
+		return binPath
+	}
+	var candidates []string
+	if runtime.GOOS == "windows" {
+		candidates = []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Docker", "Docker", "resources", "bin", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Docker", "Docker", "resources", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramData"), "DockerDesktop", "version-bin", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "RedHat", "Podman", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "containerd", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "containerd", "bin", binary+".exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Rancher Desktop", "resources", "resources", "win32", "bin", binary+".exe"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "Docker", "resources", "bin", binary+".exe"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "Podman", binary+".exe"),
+		}
+	} else {
+		candidates = []string{
+			"/usr/bin/" + binary,
+			"/usr/local/bin/" + binary,
+			"/opt/homebrew/bin/" + binary,
+			"/usr/local/opt/" + binary,
+			"/usr/sbin/" + binary,
+			"/run/current-system/sw/bin/" + binary,
+		}
+	}
+	for _, cand := range candidates {
+		if cand == "" {
+			continue
+		}
+		if _, err := os.Stat(cand); err == nil {
+			return cand
+		}
+	}
+	return ""
+}
+
 func probeCommand(binary string, testArgs []string, rtType RuntimeType, name string) (HostRuntimeReport, bool) {
-	binPath, err := exec.LookPath(binary)
-	if err != nil {
+	binPath := findRuntimeBinary(binary)
+	if binPath == "" {
 		return HostRuntimeReport{}, false
 	}
 

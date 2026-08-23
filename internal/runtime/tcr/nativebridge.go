@@ -106,6 +106,22 @@ func DetectImageType(rootfs string, command []string) ImageType {
 		}
 	}
 
+	// Check for Node.js project files
+	for _, sub := range []string{"", "app", "opt", "usr/src/app", "var/www", "home"} {
+		if fileExistsIn(filepath.Join(rootfs, sub), "package.json") {
+			return ImageTypeNodeJS
+		}
+	}
+
+	// Check for Python project files
+	for _, sub := range []string{"", "app", "opt", "usr/src/app", "src"} {
+		for _, pyFile := range []string{"requirements.txt", "Pipfile", "setup.py", "app.py", "main.py", "server.py", "wsgi.py"} {
+			if fileExistsIn(filepath.Join(rootfs, sub), pyFile) {
+				return ImageTypePython
+			}
+		}
+	}
+
 	// Check for static site (html files without server binary)
 	if dirHasHTML(rootfs) {
 		return ImageTypeStaticSite
@@ -121,39 +137,47 @@ func FindWebRoot(rootfs string, imageType ImageType) string {
 	if imageType == ImageTypeNginx {
 		if root := parseNginxRoot(rootfs); root != "" {
 			candidate := filepath.Join(rootfs, filepath.FromSlash(root))
-			if _, err := os.Stat(candidate); err == nil {
+			if _, err := os.Stat(candidate); err == nil && dirHasHTML(candidate) {
 				return candidate
+			}
+		}
+		for _, rel := range []string{"usr/share/nginx/html", "usr/local/nginx/html", "var/www/html"} {
+			full := filepath.Join(rootfs, filepath.FromSlash(rel))
+			if dirHasHTML(full) {
+				return full
 			}
 		}
 	}
 
-	// Try common web root locations in order of preference
+	// Try application web root locations in order of preference
 	candidates := []string{
-		"usr/share/nginx/html",
-		"usr/local/nginx/html",
+		"dist",
+		"build",
+		"public",
+		"webroot",
+		"app/dist",
+		"app/build",
+		"app/public",
+		"app/webroot",
 		"var/www/html",
 		"var/www",
 		"srv/http",
 		"www",
-		"public",
 		"htdocs",
-		"webroot",
-		"dist",
-		"build",
 		"static",
+		"usr/share/nginx/html",
 	}
 	for _, rel := range candidates {
 		full := filepath.Join(rootfs, filepath.FromSlash(rel))
 		if dirHasHTML(full) {
 			return full
 		}
-		// Even if no HTML yet, return first existing dir
-		if _, err := os.Stat(full); err == nil {
-			return full
-		}
 	}
 
-	// Last resort: return the rootfs itself
+	// Last resort: check if rootfs root has html
+	if dirHasHTML(rootfs) {
+		return rootfs
+	}
 	return rootfs
 }
 

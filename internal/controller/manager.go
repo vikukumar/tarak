@@ -778,10 +778,16 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 				}
 				if match {
 					pStatus, _ := pObj["status"].(map[string]interface{})
+					podPhase, _ := pStatus["phase"].(string)
+					if podPhase != "" && podPhase != "Running" && podPhase != "Pending" {
+						continue
+					}
 					podIP, _ := pStatus["podIP"].(string)
 					if podIP == "" {
 						podIP = "127.0.0.1"
 					}
+					pName, _ := pMeta["name"].(string)
+
 					// Find container target port
 					pSpec, _ := pObj["spec"].(map[string]interface{})
 					pContainers, _ := pSpec["containers"].([]interface{})
@@ -797,13 +803,20 @@ func (m *Manager) reconcileServices(ctx context.Context, group, version string) 
 							}
 						}
 					}
+
+					// Resolve real active host port for this pod container
+					realPort := tPort
+					if m.runtime != nil {
+						realPort = m.runtime.GetHostPort(ns, pName, tPort)
+					}
+
 					endpoints = append(endpoints, loadbalancer.Endpoint{
 						Address: "127.0.0.1",
-						Port:    tPort,
+						Port:    realPort,
 						Healthy: true,
 					})
 					if m.netDriver != nil && podIP != "127.0.0.1" {
-						m.netDriver.RegisterPodRoute(podIP, fmt.Sprintf("127.0.0.1:%d", tPort))
+						m.netDriver.RegisterPodRoute(podIP, fmt.Sprintf("127.0.0.1:%d", realPort))
 					}
 				}
 			}

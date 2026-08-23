@@ -509,12 +509,24 @@ func (e *Engine) runContainerViaTCR(ctx context.Context, spec PodRuntimeSpec, cS
 		workDir = "/"
 	}
 
-	// Collect container ports for the bridge HTTP server / native process
+	// Collect container ports and allocate unique host ports for isolation
 	var ports []int
-	for _, p := range cSpec.Ports {
+	for pIdx, p := range cSpec.Ports {
 		if p.ContainerPort > 0 {
-			ports = append(ports, p.ContainerPort)
+			hp := p.HostPort
+			if hp == 0 {
+				hp = allocateFreeHostPort()
+				info.Ports[pIdx].HostPort = hp
+			}
+			ports = append(ports, hp)
+			envList = append(envList, fmt.Sprintf("PORT=%d", hp))
+			envList = append(envList, fmt.Sprintf("CONTAINER_PORT=%d", p.ContainerPort))
 		}
+	}
+	if len(ports) == 0 {
+		defaultHP := allocateFreeHostPort()
+		ports = []int{defaultHP}
+		envList = append(envList, fmt.Sprintf("PORT=%d", defaultHP))
 	}
 
 	tcrCfg := tcr.ContainerConfig{
@@ -547,14 +559,6 @@ func (e *Engine) runContainerViaTCR(ctx context.Context, spec PodRuntimeSpec, cS
 	info.DockerID = fmt.Sprintf("tcr-%d", proc.PID)
 	info.Rootfs = rootfs
 	info.WorkDir = workDir
-
-	// For TCR containers, port forwarding is via host network.
-	// Set HostPort = ContainerPort (container binds the port on the host directly).
-	for pIdx, p := range info.Ports {
-		if p.ContainerPort > 0 && p.HostPort == 0 {
-			info.Ports[pIdx].HostPort = p.ContainerPort
-		}
-	}
 
 	e.log.Info("TCR container started",
 		zap.String("os", runtime.GOOS),
@@ -700,6 +704,15 @@ func (e *Engine) inspectAndUpdatePorts(ctx context.Context, cID string, info *Co
 			}
 		}
 	}
+}
+
+func allocateFreeHostPort() int {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 10000 + int(time.Now().UnixNano()%20000)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 // GetHostPort returns the actual listening host port for a container in a pod.
