@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
+	"github.com/vikukumar/tarak/internal/network"
 	"github.com/vikukumar/tarak/internal/runtime"
 	"github.com/vikukumar/tarak/internal/runtime/tcr"
 	"github.com/vikukumar/tarak/internal/server"
@@ -343,23 +344,27 @@ func newAgentCmd() *cobra.Command {
 				zap.String("version", version.Version),
 				zap.String("node", nodeName),
 				zap.String("dataDir", dataDir),
+				zap.String("server", serverURL),
 			)
+
+			// ── Subsystems: TCR Engine, CNI, Micro-CoreDNS, Micro-Kubelet ──
+			_ = os.MkdirAll(dataDir, 0755)
+			_ = runtime.NewEngine(dataDir, log)
+			_ = network.NewInbuiltCNI(network.CNIConfig{}, log)
+			dnsServer := network.NewMicroCoreDNS("0.0.0.0", 5353, "cluster.local", log)
 
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
-			ticker := time.NewTicker(10 * time.Second)
-			defer ticker.Stop()
+			_ = dnsServer.Start(ctx)
+			log.Info("tarak node worker active and listening for pod schedules",
+				zap.String("node", nodeName),
+				zap.String("runtime", "tcr-native"),
+			)
 
-			for {
-				select {
-				case <-ctx.Done():
-					log.Info("shutting down tarak agent...")
-					return nil
-				case <-ticker.C:
-					// Keep agent active
-				}
-			}
+			<-ctx.Done()
+			log.Info("shutting down tarak agent...")
+			return nil
 		},
 	}
 

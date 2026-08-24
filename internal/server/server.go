@@ -180,6 +180,11 @@ type Server struct {
 	proxyPatchMgr   *mesh.ProxyPatchManager
 	hostInfo        hardware.HostInfo
 	alloc           hardware.ResourceAllocation
+	dnsServer       *network.MicroCoreDNS
+	kubelet         *controller.MicroKubelet
+	embeddedETCD    *statestore.EmbeddedETCD
+	iptables        *network.IPTablesManager
+	overlayMesh     *network.OverlayMesh
 }
 
 // New creates a new Server from the given configuration.
@@ -244,6 +249,12 @@ func New(cfg Config) (*Server, error) {
 		EnablePolicy: cfg.CNIEnablePolicy,
 	}, cfg.Log)
 
+	dnsServer := network.NewMicroCoreDNS("0.0.0.0", 5353, "cluster.local", cfg.Log)
+	microKubelet := controller.NewMicroKubelet("tarak-control-plane", cfg.DataDir, store, rt, inbuiltCNI, dnsServer, cfg.Log)
+	embeddedETCD := statestore.NewEmbeddedETCD("tarak-master-01", store, cfg.Log)
+	iptablesMgr := network.NewIPTablesManager(cfg.Log)
+	overlayMesh := network.NewOverlayMesh(netDriver.GetHostNetworkInfo().PrimaryLANIP, 42, cfg.Log)
+
 	// Add state store health check.
 	h.AddCheck("statestore", func() error {
 		_, err := store.CurrentRevision(context.Background())
@@ -273,6 +284,11 @@ func New(cfg Config) (*Server, error) {
 		proxyPatchMgr:   ppMgr,
 		hostInfo:        hostInfo,
 		alloc:           alloc,
+		dnsServer:       dnsServer,
+		kubelet:         microKubelet,
+		embeddedETCD:    embeddedETCD,
+		iptables:        iptablesMgr,
+		overlayMesh:     overlayMesh,
 	}
 	return s, nil
 }
@@ -528,6 +544,29 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Delete("/namespaces/{namespace}/routes/{name}", s.meshEngine.HandleDeleteRoute)
 	})
 
+	// ── Embedded ETCD v3 API ──────────────────────────────────────────────
+	r.Route("/v3", func(r chi.Router) {
+		r.Post("/kv/range", func(w http.ResponseWriter, req *http.Request) {
+			s.embeddedETCD.RegisterHTTPHandler(http.DefaultServeMux)
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+		r.Post("/kv/put", func(w http.ResponseWriter, req *http.Request) {
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+		r.Post("/kv/deleterange", func(w http.ResponseWriter, req *http.Request) {
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+		r.Post("/lease/grant", func(w http.ResponseWriter, req *http.Request) {
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+		r.Post("/lease/keepalive", func(w http.ResponseWriter, req *http.Request) {
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+		r.Post("/cluster/member/list", func(w http.ResponseWriter, req *http.Request) {
+			http.DefaultServeMux.ServeHTTP(w, req)
+		})
+	})
+
 	// ── Native Zero-Trust Security API ────────────────────────────────────
 	r.Route("/apis/security.tarak.io/v1/zerotrust", func(r chi.Router) {
 		r.Get("/policies", s.zeroTrustMgr.HandleListPolicies)
@@ -705,6 +744,12 @@ func (s *Server) Run(ctx context.Context) error {
 		"║  🛡️ Remote Access Command     : tarakctl login https://%s\n"+
 		"╚══════════════════════════════════════════════════════════════════════════════════╝\n\n",
 		version.String(), s.cfg.BindAddress, s.cfg.IngressHTTPAddress, s.cfg.BindAddress)
+
+	// ── Start Embedded Subsystems: CNI, Micro-CoreDNS, IPTables, Overlay, Micro-Kubelet ──
+	_ = s.iptables.InitChains()
+	_ = s.dnsServer.Start(ctx)
+	_ = s.overlayMesh.Start(ctx)
+	s.kubelet.Start(ctx)
 
 	// ── Controller Manager ───────────────────────────────────────────────
 	ctrlMgr := controller.NewManager(s.store, s.runtime, s.lbCtrl, s.networkDriver, s.log)
