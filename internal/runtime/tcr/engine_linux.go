@@ -88,7 +88,8 @@ func platformStart(ctx context.Context, cfg ContainerConfig, logFilePath string)
 
 	if err := cmd.Start(); err != nil {
 		logFile.Close()
-		return nil, fmt.Errorf("start container init: %w\nHint: ensure rootfs exists at %s", err, cfg.Rootfs)
+		// Fallback to Native Bridge runtime if namespace clone is disallowed by kernel/sysctl
+		return StartBridgeContainer(ctx, cfg, cfg.Ports, logFilePath)
 	}
 
 	proc := &Process{

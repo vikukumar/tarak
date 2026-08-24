@@ -269,8 +269,66 @@ func (m *Manager) reconcileDeployments(ctx context.Context, group, version strin
 			}
 		}
 
-		// Update Deployment Status
+		// Create / Sync ReplicaSet for this deployment revision
 		nowStr := time.Now().UTC().Format(time.RFC3339)
+		rsName := fmt.Sprintf("%s-%s", name, hash)
+		rsLabels := map[string]interface{}{
+			"pod-template-hash": hash,
+		}
+		for k, v := range tmplLabels {
+			rsLabels[k] = v
+		}
+
+		rsObj := map[string]interface{}{
+			"apiVersion": group + "/" + version,
+			"kind":       "ReplicaSet",
+			"metadata": map[string]interface{}{
+				"name":      rsName,
+				"namespace": ns,
+				"labels":    rsLabels,
+				"ownerReferences": []map[string]interface{}{
+					{
+						"apiVersion": group + "/" + version,
+						"kind":       "Deployment",
+						"name":       name,
+						"uid":        uid,
+						"controller": true,
+					},
+				},
+				"creationTimestamp": nowStr,
+			},
+			"spec": map[string]interface{}{
+				"replicas": replicas,
+				"selector": map[string]interface{}{
+					"matchLabels": tmplLabels,
+				},
+				"template": template,
+			},
+			"status": map[string]interface{}{
+				"replicas":          currentCount,
+				"readyReplicas":     readyCount,
+				"availableReplicas": readyCount,
+				"observedGeneration": 1,
+			},
+		}
+
+		if rsBytes, mErr := json.Marshal(rsObj); mErr == nil {
+			rsKey := statestore.ResourceKey{
+				Group:     group,
+				Version:   version,
+				Resource:  "replicasets",
+				Namespace: ns,
+				Name:      rsName,
+			}
+			if _, getErr := m.store.Get(ctx, rsKey); getErr != nil {
+				_, _ = m.store.Create(ctx, rsKey, rsBytes)
+			} else {
+				_, _ = m.store.Update(ctx, rsKey, rsBytes, 0)
+			}
+		}
+
+		// Update Deployment Status
+		nowStr = time.Now().UTC().Format(time.RFC3339)
 		deployStatus := map[string]interface{}{
 			"replicas":            replicas,
 			"readyReplicas":       readyCount,

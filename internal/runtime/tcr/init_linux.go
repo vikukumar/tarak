@@ -123,7 +123,17 @@ func RunContainerInit() error {
 		}
 	}
 
-	return syscall.Exec(binary, cfg.Command, cfg.Env)
+	execErr := syscall.Exec(binary, cfg.Command, cfg.Env)
+	if execErr != nil {
+		// Fallback: try via /bin/sh or /bin/bash
+		for _, sh := range []string{"/bin/sh", "/bin/bash", "/usr/bin/sh", "/usr/bin/bash"} {
+			if _, statErr := os.Stat(sh); statErr == nil {
+				shCmd := []string{sh, "-c", strings.Join(cfg.Command, " ")}
+				_ = syscall.Exec(sh, shCmd, cfg.Env)
+			}
+		}
+	}
+	return execErr
 }
 
 // RunContainerExec is called when the tarak binary is re-executed with

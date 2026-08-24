@@ -567,6 +567,25 @@ func handleApplyOrFile(path string, isApply bool) error {
 		if ns == "" {
 			ns = effectiveNamespace()
 		}
+		if ns == "" {
+			ns = "default"
+		}
+
+		// Inject namespace into manifest JSON metadata if not already present
+		var objMap map[string]interface{}
+		if json.Unmarshal(jsonData, &objMap) == nil {
+			meta, _ := objMap["metadata"].(map[string]interface{})
+			if meta == nil {
+				meta = make(map[string]interface{})
+				objMap["metadata"] = meta
+			}
+			if currNS, _ := meta["namespace"].(string); currNS == "" {
+				meta["namespace"] = ns
+				if mutated, mErr := json.Marshal(objMap); mErr == nil {
+					jsonData = mutated
+				}
+			}
+		}
 
 		getURL := buildURL(client.serverURL, resource, ns, name)
 		existing, getErr := client.get(getURL)
@@ -2357,8 +2376,12 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 			}
 
 			if allNamespaces {
+				ns := svc.Metadata.Namespace
+				if ns == "" {
+					ns = "default"
+				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-					svc.Metadata.Namespace, displayName, svcType, cip, extIP, portStr, age)
+					ns, displayName, svcType, cip, extIP, portStr, age)
 			} else {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 					displayName, svcType, cip, extIP, portStr, age)
@@ -2404,8 +2427,12 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 			}
 
 			if allNamespaces {
+				ns := d.Metadata.Namespace
+				if ns == "" {
+					ns = "default"
+				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d\t%s\n",
-					d.Metadata.Namespace, displayName, readyStr, d.Status.UpdatedReplicas, d.Status.AvailableReplicas, age)
+					ns, displayName, readyStr, d.Status.UpdatedReplicas, d.Status.AvailableReplicas, age)
 			} else {
 				fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\n",
 					displayName, readyStr, d.Status.UpdatedReplicas, d.Status.AvailableReplicas, age)
@@ -2447,8 +2474,12 @@ func renderTable(items []json.RawMessage, resource string, wide, allNamespaces, 
 			}
 
 			if allNamespaces {
+				ns := rs.Metadata.Namespace
+				if ns == "" {
+					ns = "default"
+				}
 				fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%s\n",
-					rs.Metadata.Namespace, displayName, desired, rs.Status.Replicas, rs.Status.ReadyReplicas, age)
+					ns, displayName, desired, rs.Status.Replicas, rs.Status.ReadyReplicas, age)
 			} else {
 				fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\n",
 					displayName, desired, rs.Status.Replicas, rs.Status.ReadyReplicas, age)

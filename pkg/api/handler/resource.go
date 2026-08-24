@@ -141,6 +141,26 @@ func (h *ResourceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.desc.Namespaced {
+		if key.Namespace == "" {
+			key.Namespace = "default"
+		}
+		var objMap map[string]interface{}
+		if err := json.Unmarshal(body, &objMap); err == nil {
+			meta, _ := objMap["metadata"].(map[string]interface{})
+			if meta == nil {
+				meta = make(map[string]interface{})
+				objMap["metadata"] = meta
+			}
+			if currNS, _ := meta["namespace"].(string); currNS == "" {
+				meta["namespace"] = key.Namespace
+				if mutated, mErr := json.Marshal(objMap); mErr == nil {
+					body = mutated
+				}
+			}
+		}
+	}
+
 	// Service ClusterIP defaulting
 	if h.desc.Resource == "services" || h.desc.Kind == "Service" {
 		var svcMap map[string]interface{}

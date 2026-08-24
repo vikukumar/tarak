@@ -154,17 +154,40 @@ func (f *Forwarder) acceptLoop(ctx context.Context, listenAddr string, ln net.Li
 func (f *Forwarder) handleConnection(listenAddr string, clientConn net.Conn) {
 	defer clientConn.Close()
 
-	// Select next healthy endpoint via Round-Robin
-	endpoint := f.selectEndpoint(listenAddr)
-	if endpoint == nil {
-		f.log.Warn("no healthy backend endpoint available for connection", zap.String("listenAddr", listenAddr))
+	f.mu.RLock()
+	eps := make([]Endpoint, len(f.endpoints[listenAddr]))
+	copy(eps, f.endpoints[listenAddr])
+	f.mu.RUnlock()
+
+	if len(eps) == 0 {
+		f.log.Warn("no backend endpoint available for connection", zap.String("listenAddr", listenAddr))
+		_, _ = clientConn.Write([]byte("HTTP/1.1 503 Service Unavailable\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n503 Service Unavailable: no backends registered\r\n"))
 		return
 	}
 
-	targetAddr := fmt.Sprintf("%s:%d", endpoint.Address, endpoint.Port)
-	backendConn, err := net.DialTimeout("tcp", targetAddr, 3*time.Second)
-	if err != nil {
-		f.log.Error("failed to connect to backend endpoint", zap.String("target", targetAddr), zap.Error(err))
+	// Try round-robin selected endpoint first, with fallback to other endpoints
+	var backendConn net.Conn
+	var dialErr error
+	startIdx := 0
+	f.mu.RLock()
+	if ctr, ok := f.rrCounter[listenAddr]; ok {
+		startIdx = int(atomic.AddUint64(ctr, 1) % uint64(len(eps)))
+	}
+	f.mu.RUnlock()
+
+	for i := 0; i < len(eps); i++ {
+		idx := (startIdx + i) % len(eps)
+		ep := eps[idx]
+		targetAddr := fmt.Sprintf("%s:%d", ep.Address, ep.Port)
+		backendConn, dialErr = net.DialTimeout("tcp", targetAddr, 2*time.Second)
+		if dialErr == nil {
+			break
+		}
+	}
+
+	if backendConn == nil {
+		f.log.Warn("all backend endpoints unreachable for listener", zap.String("listenAddr", listenAddr), zap.Error(dialErr))
+		_, _ = clientConn.Write([]byte("HTTP/1.1 503 Service Unavailable\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n503 Service Unavailable: backend pod unreachable\r\n"))
 		return
 	}
 	defer backendConn.Close()
