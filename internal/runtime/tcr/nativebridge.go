@@ -277,22 +277,25 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			if len(nodeArgs) == 0 {
 				for _, candidate := range []string{"src/server.js", "src/index.js", "src/app.js", "server.js", "index.js", "app.js", "main.js", "dist/index.js"} {
 					if fileExistsIn(workDir, candidate) {
-						nodeArgs = []string{candidate}
+						nodeArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
 						break
 					}
 					if fileExistsIn(cfg.Rootfs, candidate) {
-						absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate)))
-						nodeArgs = []string{absPath}
+						nodeArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
 						break
 					}
 				}
 			} else {
 				script := nodeArgs[0]
-				if fileExistsIn(workDir, script) {
+				if strings.HasPrefix(script, cfg.Rootfs) {
 					nodeArgs[0] = script
-				} else if fileExistsIn(cfg.Rootfs, script) {
-					absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(script)))
-					nodeArgs[0] = absPath
+				} else {
+					cleanRel := strings.TrimPrefix(strings.TrimPrefix(script, "/"), "\\")
+					if fileExistsIn(workDir, cleanRel) {
+						nodeArgs[0] = filepath.Join(workDir, filepath.FromSlash(cleanRel))
+					} else if fileExistsIn(cfg.Rootfs, cleanRel) {
+						nodeArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(cleanRel))
+					}
 				}
 			}
 			if len(nodeArgs) > 0 {
@@ -342,22 +345,25 @@ func StartBridgeContainer(ctx context.Context, cfg ContainerConfig, ports []int,
 			if len(pyArgs) == 0 {
 				for _, candidate := range []string{"app.py", "main.py", "server.py", "wsgi.py", "src/main.py"} {
 					if fileExistsIn(workDir, candidate) {
-						pyArgs = []string{candidate}
+						pyArgs = []string{filepath.Join(workDir, filepath.FromSlash(candidate))}
 						break
 					}
 					if fileExistsIn(cfg.Rootfs, candidate) {
-						absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate)))
-						pyArgs = []string{absPath}
+						pyArgs = []string{filepath.Join(cfg.Rootfs, filepath.FromSlash(candidate))}
 						break
 					}
 				}
 			} else {
 				script := pyArgs[0]
-				if fileExistsIn(workDir, script) {
+				if strings.HasPrefix(script, cfg.Rootfs) {
 					pyArgs[0] = script
-				} else if fileExistsIn(cfg.Rootfs, script) {
-					absPath, _ := filepath.Abs(filepath.Join(cfg.Rootfs, filepath.FromSlash(script)))
-					pyArgs[0] = absPath
+				} else {
+					cleanRel := strings.TrimPrefix(strings.TrimPrefix(script, "/"), "\\")
+					if fileExistsIn(workDir, cleanRel) {
+						pyArgs[0] = filepath.Join(workDir, filepath.FromSlash(cleanRel))
+					} else if fileExistsIn(cfg.Rootfs, cleanRel) {
+						pyArgs[0] = filepath.Join(cfg.Rootfs, filepath.FromSlash(cleanRel))
+					}
 				}
 			}
 			if len(pyArgs) > 0 {

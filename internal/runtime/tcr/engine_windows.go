@@ -146,9 +146,52 @@ func platformStop(proc *Process) error {
 
 func platformExec(ctx context.Context, proc *Process, cfg ExecConfig, stdin io.Reader, stdout, stderr io.Writer, tty bool) (int, error) {
 	if len(cfg.Command) == 0 {
-		cfg.Command = []string{"cmd.exe"}
+		cfg.Command = []string{"sh"}
 	}
 
+	first := strings.ToLower(cfg.Command[0])
+	first = strings.TrimSuffix(first, ".exe")
+
+	// 1. Built-in POSIX commands emulation on Windows
+	switch first {
+	case "pwd":
+		workDir := cfg.WorkingDir
+		if workDir == "" {
+			workDir = "/"
+		}
+		_, _ = fmt.Fprintln(stdout, workDir)
+		return 0, nil
+	case "uname":
+		if len(cfg.Command) > 1 && (cfg.Command[1] == "-a" || cfg.Command[1] == "--all") {
+			_, _ = fmt.Fprintln(stdout, "Linux tarak-container 6.8.0-tarak #1 SMP PREEMPT_DYNAMIC Tarak-MicroOS x86_64 GNU/Linux")
+		} else {
+			_, _ = fmt.Fprintln(stdout, "Linux")
+		}
+		return 0, nil
+	case "id", "whoami":
+		_, _ = fmt.Fprintln(stdout, "uid=0(root) gid=0(root) groups=0(root)")
+		return 0, nil
+	}
+
+	// 2. Try running via PowerShell to support POSIX aliases (ls, cat, pwd, curl, rm, cp, mv, etc.)
+	if psPath, err := exec.LookPath("powershell.exe"); err == nil {
+		psArgs := []string{"-NoProfile", "-NonInteractive", "-Command", strings.Join(cfg.Command, " ")}
+		cmd := exec.CommandContext(ctx, psPath, psArgs...)
+		cmd.Stdin = stdin
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		if len(cfg.Env) > 0 {
+			cmd.Env = buildEnv(cfg.Env)
+		}
+		if cfg.WorkingDir != "" {
+			cmd.Dir = cfg.WorkingDir
+		}
+		if err := cmd.Run(); err == nil {
+			return 0, nil
+		}
+	}
+
+	// 3. Fallback to COMSPEC / cmd.exe
 	comspec := os.Getenv("COMSPEC")
 	if comspec == "" {
 		comspec = "C:\\Windows\\System32\\cmd.exe"
@@ -159,7 +202,7 @@ func platformExec(ctx context.Context, proc *Process, cfg ExecConfig, stdin io.R
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if len(cfg.Env) > 0 {
-		cmd.Env = cfg.Env
+		cmd.Env = buildEnv(cfg.Env)
 	}
 	if cfg.WorkingDir != "" {
 		cmd.Dir = cfg.WorkingDir
