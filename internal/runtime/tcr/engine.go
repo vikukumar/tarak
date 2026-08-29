@@ -67,6 +67,10 @@ type Process struct {
 	PID       int
 	Rootfs    string
 	StartedAt time.Time
+	// BoundPort is the actual OS-assigned TCP port the container is listening on.
+	// For bridge HTTP containers this may differ from the originally requested port
+	// when that port was already in use (the OS assigns an ephemeral :0 port).
+	BoundPort int
 	mu        sync.Mutex
 	state     string
 	exitCode  int

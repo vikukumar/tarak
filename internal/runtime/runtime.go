@@ -560,11 +560,39 @@ func (e *Engine) runContainerViaTCR(ctx context.Context, spec PodRuntimeSpec, cS
 	info.Rootfs = rootfs
 	info.WorkDir = workDir
 
+	// Update ContainerInfo.Ports with the actual OS-assigned port from the bridge runtime.
+	// proc.BoundPort is set by startBuiltinHTTPServer and may differ from the requested port
+	// when that port was already in use (bridge fell back to :0).
+	if proc.BoundPort > 0 {
+		updated := false
+		for pIdx := range info.Ports {
+			if !updated {
+				// Map the first port entry to the actual bound port
+				e.log.Info("TCR: updating container port to actual bound port",
+					zap.String("container", cSpec.Name),
+					zap.Int("requested", info.Ports[pIdx].HostPort),
+					zap.Int("actual", proc.BoundPort),
+				)
+				info.Ports[pIdx].HostPort = proc.BoundPort
+				updated = true
+			}
+		}
+		if !updated && len(info.Ports) == 0 {
+			// No ports were declared — add one for the bound port
+			info.Ports = append(info.Ports, ContainerPort{
+				ContainerPort: proc.BoundPort,
+				HostPort:      proc.BoundPort,
+				Protocol:      "TCP",
+			})
+		}
+	}
+
 	e.log.Info("TCR container started",
 		zap.String("os", runtime.GOOS),
 		zap.String("container", cSpec.Name),
 		zap.String("image", cSpec.Image),
 		zap.Int("pid", proc.PID),
+		zap.Int("boundPort", proc.BoundPort),
 		zap.String("rootfs", rootfs),
 	)
 }
@@ -771,10 +799,59 @@ func (e *Engine) DialPod(ctx context.Context, ns, podName string, targetPort int
 		}
 	}
 
-	// Fallback: use cached HostPort from ContainerInfo
-	hostPort := e.GetHostPort(ns, podName, targetPort)
-	return net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", hostPort), 5*time.Second)
+	// Fallback: use cached HostPort from ContainerInfo.
+	// Retry up to 5 times (1 second total) in case the container is still starting.
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+		hostPort := e.resolveActualHostPort(ns, podName, targetPort)
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", hostPort), 2*time.Second)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		e.log.Warn("DialPod: connection refused, retrying",
+			zap.String("pod", podName),
+			zap.Int("targetPort", targetPort),
+			zap.Int("hostPort", hostPort),
+			zap.Int("attempt", attempt+1),
+			zap.Error(err),
+		)
+	}
+	return nil, fmt.Errorf("error connecting to target container on port %d: %w", targetPort, lastErr)
 }
+
+// resolveActualHostPort finds the real host port for a given container port.
+// It checks all registered ports for the pod — including BoundPort from TCR bridge containers.
+func (e *Engine) resolveActualHostPort(ns, podName string, targetPort int) int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	prefix := fmt.Sprintf("%s/%s/", ns, podName)
+	for key, info := range e.containers {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		// Exact ContainerPort match
+		for _, p := range info.Ports {
+			if p.ContainerPort == targetPort && p.HostPort > 0 {
+				return p.HostPort
+			}
+		}
+		// If no exact match but pod has a single port mapped, use that
+		if len(info.Ports) == 1 && info.Ports[0].HostPort > 0 {
+			return info.Ports[0].HostPort
+		}
+	}
+	return targetPort
+}
+
 
 // StopPodContainers stops and removes all containers for a pod.
 func (e *Engine) StopPodContainers(ctx context.Context, ns, podName string) error {
@@ -890,11 +967,11 @@ func (e *Engine) GetLogs(ctx context.Context, ns, podName, containerName string,
 		}
 	}
 
-	// Fallback to reading authentic log file in Sandbox Mode
+	// Fallback to reading authentic log file in Sandbox / TCR mode
 	logDir := filepath.Join(e.dataDir, "containers", ns, podName, containerName)
-	logFile := filepath.Join(logDir, "stdout.log")
+	logFilePath := filepath.Join(logDir, "stdout.log")
 
-	data, err := os.ReadFile(logFile)
+	data, err := os.ReadFile(logFilePath)
 	if err != nil {
 		// Do not synthesize logs. Return actual error if not found.
 		return fmt.Errorf("could not read logs for container %s: %w", containerName, err)
@@ -908,14 +985,44 @@ func (e *Engine) GetLogs(ctx context.Context, ns, podName, containerName string,
 		_, _ = fmt.Fprintln(out, l)
 	}
 
-	// In Sandbox Mode without Docker, we do not currently implement true fsnotify log streaming.
-	// If follow is true, we simply block until context cancels rather than hallucinating traffic.
-	if follow {
-		<-ctx.Done()
+	if !follow {
+		return nil
 	}
 
-	return nil
+	// Real tail-follow: poll for new bytes appended to the file every 200ms.
+	// This is equivalent to `tail -f` without requiring inotify/fsnotify.
+	offset := int64(len(data))
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	// Flush the writer if it supports flushing (e.g. http.ResponseWriter)
+	type flusher interface{ Flush() }
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			f, ferr := os.Open(logFilePath)
+			if ferr != nil {
+				continue
+			}
+			if _, serr := f.Seek(offset, io.SeekStart); serr != nil {
+				f.Close()
+				continue
+			}
+			n, _ := io.Copy(out, f)
+			f.Close()
+			if n > 0 {
+				offset += n
+				if fl, ok := out.(flusher); ok {
+					fl.Flush()
+				}
+			}
+		}
+	}
 }
+
 
 // ─── Exec Command ─────────────────────────────────────────────────────────────
 

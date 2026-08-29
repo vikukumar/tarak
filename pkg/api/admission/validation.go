@@ -109,13 +109,16 @@ func (v *Validator) ValidateUpdate(kind string, rawObj, existingRaw []byte) erro
 	// Validate immutable fields against the existing object.
 	var existing genericObject
 	if err := json.Unmarshal(existingRaw, &existing); err == nil {
-		if obj.Kind != existing.Kind {
+		if obj.Kind != existing.Kind && obj.Kind != "" {
 			errs = append(errs, &ValidationError{Field: "kind", Reason: "field is immutable"})
 		}
-		if obj.Metadata.Name != existing.Metadata.Name {
+		if obj.Metadata.Name != existing.Metadata.Name && obj.Metadata.Name != "" {
 			errs = append(errs, &ValidationError{Field: "metadata.name", Reason: "field is immutable"})
 		}
-		if obj.Metadata.Namespace != existing.Metadata.Namespace {
+		// Only reject namespace changes when both are non-empty AND they differ.
+		// When kubectl apply omits the namespace or it matches the existing value, allow it.
+		if obj.Metadata.Namespace != "" && existing.Metadata.Namespace != "" &&
+			obj.Metadata.Namespace != existing.Metadata.Namespace {
 			errs = append(errs, &ValidationError{Field: "metadata.namespace", Reason: "field is immutable"})
 		}
 	}

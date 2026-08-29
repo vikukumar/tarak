@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -1588,8 +1589,70 @@ type kubeconfigAuthInfo struct {
 		ClientKey             string `yaml:"client-key"`
 		ClientKeyData         string `yaml:"client-key-data"`
 		Token                 string `yaml:"token"`
+		TokenFile             string `yaml:"tokenFile"`
+		Username              string `yaml:"username"`
+		Password              string `yaml:"password"`
+		// Exec-based credential provider (EKS, GKE, AKS, etc.)
+		Exec *kubeconfigExecConfig `yaml:"exec,omitempty"`
 	} `yaml:"user"`
 }
+
+// kubeconfigExecConfig defines an external credential provider (e.g. aws-iam-authenticator, gke-gcloud-auth-plugin).
+type kubeconfigExecConfig struct {
+	APIVersion  string            `yaml:"apiVersion"`
+	Command     string            `yaml:"command"`
+	Args        []string          `yaml:"args"`
+	Env         []map[string]string `yaml:"env"`
+	InstallHint string            `yaml:"installHint"`
+}
+
+// execCredentialStatus is the relevant part of the ExecCredential status output.
+type execCredentialStatus struct {
+	Token                 string `json:"token"`
+	ClientCertificateData string `json:"clientCertificateData"`
+	ClientKeyData         string `json:"clientKeyData"`
+}
+
+// runExecCredentialPlugin runs an external auth plugin and returns the credential status.
+func runExecCredentialPlugin(cfg *kubeconfigExecConfig) (*execCredentialStatus, error) {
+	if cfg == nil || cfg.Command == "" {
+		return nil, fmt.Errorf("exec: command is empty")
+	}
+
+	args := cfg.Args
+	cmd := exec.Command(cfg.Command, args...)
+
+	// Build env for the credential plugin
+	cmd.Env = os.Environ()
+	for _, envPair := range cfg.Env {
+		k, ok := envPair["name"]
+		v := envPair["value"]
+		if ok && k != "" {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
+	}
+	// Pass KUBERNETES_EXEC_INFO as per the Kubernetes exec credential spec
+	cmd.Env = append(cmd.Env, `KUBERNETES_EXEC_INFO={"apiVersion":"client.authentication.k8s.io/v1beta1","kind":"ExecCredential"}`)
+
+	out, err := cmd.Output()
+	if err != nil {
+		hint := ""
+		if cfg.InstallHint != "" {
+			hint = "\nHint: " + cfg.InstallHint
+		}
+		return nil, fmt.Errorf("exec credential plugin %q failed: %w%s", cfg.Command, err, hint)
+	}
+
+	// Parse ExecCredential response
+	var resp struct {
+		Status execCredentialStatus `json:"status"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return nil, fmt.Errorf("exec credential plugin %q returned invalid JSON: %w", cfg.Command, err)
+	}
+	return &resp.Status, nil
+}
+
 
 func findKubeconfigPath() string {
 	if globals.Kubeconfig != "" {

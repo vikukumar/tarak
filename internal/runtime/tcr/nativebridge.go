@@ -443,6 +443,7 @@ func startBuiltinHTTPServer(ctx context.Context, id, webRoot string, port int, l
 	proc := &Process{
 		ID:        id,
 		PID:       -1, // goroutine-based, no OS PID
+		BoundPort: actualPort, // actual OS-assigned port (may differ from requested if port was busy)
 		StartedAt: time.Now().UTC(),
 		state:     "running",
 		cancel:    cancel,
@@ -518,7 +519,7 @@ func startBuiltinHTTPServer(ctx context.Context, id, webRoot string, port int, l
 		_ = listener.Close()
 	}()
 
-	_ = actualPort
+	// actualPort is stored in proc.BoundPort above
 	return proc, nil
 }
 
