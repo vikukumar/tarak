@@ -1788,9 +1788,31 @@ func newClient() (*apiClient, error) {
 			}
 			for _, u := range kc.Users {
 				if u.Name == activeCtx.Context.User {
+					// 1. Static bearer token
 					if token == "" && u.User.Token != "" {
 						token = u.User.Token
 					}
+					// 2. Token file (projected service account tokens)
+					if token == "" && u.User.TokenFile != "" {
+						if tb, err := os.ReadFile(u.User.TokenFile); err == nil {
+							token = strings.TrimSpace(string(tb))
+						}
+					}
+					// 3. Exec credential provider (EKS aws-iam-authenticator, GKE gke-gcloud-auth-plugin, etc.)
+					if token == "" && u.User.Exec != nil {
+						if cred, execErr := runExecCredentialPlugin(u.User.Exec); execErr == nil && cred != nil {
+							if cred.Token != "" {
+								token = cred.Token
+							}
+							if cred.ClientCertificateData != "" && len(clientCertData) == 0 {
+								clientCertData, _ = base64.StdEncoding.DecodeString(cred.ClientCertificateData)
+							}
+							if cred.ClientKeyData != "" && len(clientKeyData) == 0 {
+								clientKeyData, _ = base64.StdEncoding.DecodeString(cred.ClientKeyData)
+							}
+						}
+					}
+					// 4. Client certificate (file or inline base64)
 					if len(clientCertData) == 0 {
 						if u.User.ClientCertificateData != "" {
 							clientCertData, _ = base64.StdEncoding.DecodeString(u.User.ClientCertificateData)
@@ -1804,6 +1826,12 @@ func newClient() (*apiClient, error) {
 						} else if u.User.ClientKey != "" {
 							clientKeyData, _ = os.ReadFile(u.User.ClientKey)
 						}
+					}
+					// 5. Basic auth (username/password)
+					if u.User.Username != "" {
+						// Encode as basic auth token: "Basic base64(user:pass)"
+						basicCreds := base64.StdEncoding.EncodeToString([]byte(u.User.Username + ":" + u.User.Password))
+						token = "__basic__ " + basicCreds
 					}
 					break
 				}
@@ -1935,7 +1963,10 @@ func (c *apiClient) do(req *http.Request) ([]byte, error) {
 }
 
 func (c *apiClient) setAuthHeader(req *http.Request) {
-	if c.token != "" {
+	if strings.HasPrefix(c.token, "__basic__ ") {
+		// Basic auth encoded as "__basic__ base64(user:pass)"
+		req.Header.Set("Authorization", "Basic "+strings.TrimPrefix(c.token, "__basic__ "))
+	} else if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 }
