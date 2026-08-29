@@ -67,7 +67,7 @@ func (m *Manager) Start(ctx context.Context) {
 }
 
 func (m *Manager) runLoop(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(10 * time.Second) // 10s is sufficient; 1s causes noisy hot loops
 	defer ticker.Stop()
 
 	// Run initial reconciliation immediately
@@ -477,10 +477,39 @@ func (m *Manager) reconcilePods(ctx context.Context) {
 
 		{
 
+			// ──────────────────────────────────────────────────────────────────
+			// Skip image pull and container start when the pod is already Running
+			// and all containers are confirmed healthy in the runtime.
+			// This prevents the hot reconcile loop that spams PullImage every second.
+			// ──────────────────────────────────────────────────────────────────
 			rawContainers, _ := spec["containers"].([]interface{})
+			podAlreadyRunning := existingPhase == "Running"
+			if podAlreadyRunning && m.runtime != nil {
+				// Verify every container is still alive in the runtime
+				allHealthy := true
+				for _, c := range rawContainers {
+					cMap, _ := c.(map[string]interface{})
+					if cMap == nil {
+						continue
+					}
+					cName, _ := cMap["name"].(string)
+					info, err := m.runtime.GetContainerInfo(ctx, ns, name, cName)
+					if err != nil || info == nil || info.State != runtime.StateRunning {
+						allHealthy = false
+						break
+					}
+				}
+				if allHealthy {
+					// Pod is healthy — nothing to do this cycle
+					continue
+				}
+				// Container(s) crashed — fall through to restart logic
+			}
+
 			var cSpecs []runtime.ContainerSpec
 			anyPullFailed := false
 			for _, c := range rawContainers {
+
 				cMap, _ := c.(map[string]interface{})
 				if cMap == nil {
 					continue
@@ -529,7 +558,7 @@ func (m *Manager) reconcilePods(ctx context.Context) {
 					Env:   envMap,
 				})
 
-				// Real / Emulated Image Pull
+				// Pull image only when the pod is not already running
 				m.recordEvent(ctx, ns, "Pod", name, "Pulling", fmt.Sprintf("Pulling image %q", cImg), "tarak-runtime", "Normal")
 				pullRes, pullErr := m.runtime.PullImage(ctx, cImg)
 				if pullErr != nil {
@@ -648,13 +677,26 @@ func (m *Manager) reconcilePods(ctx context.Context) {
 					{"type": "PodScheduled", "status": "True", "lastTransitionTime": nowStr},
 				},
 			}
-			updatedStatusRaw, _ := json.Marshal(pod["status"])
-			existingStatusRaw, _ := json.Marshal(existingStatus)
-			if string(updatedStatusRaw) != string(existingStatusRaw) {
+			// Compare stable status fields only — exclude dynamic timestamps to avoid
+			// infinite update loops where nowStr differs every reconcile cycle.
+			updatedPhaseStr, _ := pod["status"].(map[string]interface{})["phase"].(string)
+			existingPhaseStr, _ := existingStatus["phase"].(string)
+			updatedReadyStatus := ""
+			if conds, ok := pod["status"].(map[string]interface{})["conditions"].([]map[string]interface{}); ok {
+				for _, c := range conds {
+					if c["type"] == "Ready" {
+						updatedReadyStatus, _ = c["status"].(string)
+						break
+					}
+				}
+			}
+			phaseChanged := updatedPhaseStr != existingPhaseStr
+			if phaseChanged {
 				needsUpdate = true
 			}
+			_ = updatedReadyStatus
 			if needsUpdate {
-				m.log.Info("tarak node runtime reconciled pod", zap.String("pod", name), zap.String("phase", podPhase))
+				m.log.Info("tarak node runtime reconciled pod", zap.String("pod", name), zap.String("phase", updatedPhaseStr))
 			}
 		}
 
@@ -687,9 +729,14 @@ func (m *Manager) reconcilePods(ctx context.Context) {
 				)
 			} else {
 				_, _ = fmt.Fprintf(os.Stderr, "[controller] UPDATE OK pod %s/%s\n", ns, name)
-				m.log.Info("pod controller: updated pod status -> Running",
+				updPhase := ""
+				if updSt, ok2 := pod["status"].(map[string]interface{}); ok2 {
+					updPhase, _ = updSt["phase"].(string)
+				}
+				m.log.Info("pod controller: updated pod status",
 					zap.String("pod", name),
 					zap.String("ns", ns),
+					zap.String("phase", updPhase),
 				)
 			}
 		}
