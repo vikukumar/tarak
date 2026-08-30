@@ -4,13 +4,13 @@ import "fmt"
 
 var (
 	// Version is the current semantic version of Tarak.
-	Version = "1.0.16"
+	Version = "1.0.17"
 
 	// Commit is the git commit hash at build time.
-	Commit = "a9f3c82"
+	Commit = "f0c5300"
 
 	// BuildDate is the timestamp of the build.
-	BuildDate = "2026-08-30T14:19:00Z"
+	BuildDate = "2026-08-30T14:32:16Z"
 
 	// Author is the developer or organization who built this version.
 	Author = "vikukumar"
