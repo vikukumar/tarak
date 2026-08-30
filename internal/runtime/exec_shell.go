@@ -30,14 +30,175 @@ func ExecuteContainerShell(
 		return 0, nil
 	}
 
-	// Unwrap shell wrappers: ["sh", "-c", "..."] or ["bash", "-c", "..."]
-	if (cmd[0] == "sh" || cmd[0] == "bash" || cmd[0] == "/bin/sh" || cmd[0] == "/bin/bash") && len(cmd) > 2 && cmd[1] == "-c" {
+	base := filepath.Base(cmd[0])
+	base = strings.TrimSuffix(base, ".exe")
+	isShell := base == "sh" || base == "bash" || base == "ash" || base == "dash" ||
+		base == "/bin/sh" || base == "/bin/bash" || base == "/bin/ash"
+
+	// Interactive shell: sh/bash/ash with no arguments (or only -i / -l flags)
+	if isShell && (len(cmd) == 1 || (len(cmd) == 2 && (cmd[1] == "-i" || cmd[1] == "-l" || cmd[1] == "-s"))) {
+		return runInteractiveShell(ctx, info, ns, podName, containerName, stdin, stdout, stderr, tty, user)
+	}
+
+	// Non-interactive: sh -c "command string"
+	if isShell && len(cmd) > 2 && cmd[1] == "-c" {
 		rawCmd := strings.Join(cmd[2:], " ")
 		return executeShellString(ctx, info, ns, podName, containerName, rawCmd, stdin, stdout, stderr, tty, user)
 	}
 
 	return executeSingleCommand(ctx, info, ns, podName, containerName, cmd, stdin, stdout, stderr, tty, user)
 }
+
+// runInteractiveShell implements a real interactive REPL shell for TCR containers.
+// It reads commands from stdin line-by-line, executes them via executeShellString,
+// and writes output back — providing a real `kubectl exec -it` experience without
+// requiring Docker, Podman, or a host shell to be present.
+func runInteractiveShell(
+	ctx context.Context,
+	info *ContainerInfo,
+	ns, podName, containerName string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	tty bool,
+	user string,
+) (int, error) {
+	// Try to use the real host sh/bash first (most reliable for interactive sessions)
+	// Look for a shell binary that can actually handle interactive TTY
+	for _, shellBin := range []string{"bash", "sh", "ash"} {
+		if binPath, err := exec.LookPath(shellBin); err == nil {
+			rootfs := ""
+			if info != nil {
+				rootfs = info.Rootfs
+			}
+			hostCmd := exec.CommandContext(ctx, binPath)
+			if rootfs != "" {
+				hostCmd.Dir = rootfs
+			}
+			hostCmd.Stdin = stdin
+			hostCmd.Stdout = stdout
+			hostCmd.Stderr = stderr
+			// Set environment similar to container
+			hostCmd.Env = buildContainerEnv(ns, podName, containerName, user, info)
+			if err := hostCmd.Run(); err != nil {
+				// Shell exited — not an error if exit code is 0 or 1 (normal shell exit)
+				if exitErr, ok := err.(*exec.ExitError); ok {
+					return exitErr.ExitCode(), nil
+				}
+			}
+			return 0, nil
+		}
+	}
+
+	// Pure-Go fallback REPL: no host shell available (e.g. minimal Windows container)
+	workDir := "/"
+	if info != nil && info.WorkDir != "" {
+		workDir = info.WorkDir
+	}
+	promptUser := user
+	if promptUser == "" {
+		promptUser = "root"
+	}
+
+	prompt := fmt.Sprintf("%s@%s:%s# ", promptUser, podName, workDir)
+	if tty {
+		_, _ = fmt.Fprint(stdout, prompt)
+	}
+
+	buf := make([]byte, 4096)
+	var lineBuf strings.Builder
+
+	for {
+		select {
+		case <-ctx.Done():
+			_, _ = fmt.Fprintln(stdout)
+			return 0, nil
+		default:
+		}
+
+		n, err := stdin.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			for _, ch := range chunk {
+				if ch == '\r' {
+					continue
+				}
+				if ch == '\n' || ch == '\x00' {
+					line := strings.TrimSpace(lineBuf.String())
+					lineBuf.Reset()
+					if line == "" {
+						if tty {
+							_, _ = fmt.Fprint(stdout, prompt)
+						}
+						continue
+					}
+					if line == "exit" || line == "quit" || line == "logout" {
+						_, _ = fmt.Fprintln(stdout, "exit")
+						return 0, nil
+					}
+					// Echo the command if TTY
+					if tty {
+						_, _ = fmt.Fprintln(stdout)
+					}
+					code, _ := executeShellString(ctx, info, ns, podName, containerName, line, stdin, stdout, stderr, tty, user)
+					if tty {
+						exitIndicator := ""
+						if code != 0 {
+							exitIndicator = fmt.Sprintf("(exit %d) ", code)
+						}
+						prompt = fmt.Sprintf("%s%s@%s:%s# ", exitIndicator, promptUser, podName, workDir)
+						_, _ = fmt.Fprint(stdout, prompt)
+					}
+				} else if ch == '\x04' { // Ctrl+D
+					_, _ = fmt.Fprintln(stdout, "exit")
+					return 0, nil
+				} else if ch == '\x03' { // Ctrl+C
+					_, _ = fmt.Fprintln(stdout, "^C")
+					lineBuf.Reset()
+					if tty {
+						_, _ = fmt.Fprint(stdout, prompt)
+					}
+				} else {
+					lineBuf.WriteRune(ch)
+				}
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return 0, nil
+			}
+			return 0, err
+		}
+	}
+}
+
+// buildContainerEnv builds an environment slice for a container shell session.
+func buildContainerEnv(ns, podName, containerName, user string, info *ContainerInfo) []string {
+	homeDir := "/root"
+	if user != "" && user != "root" && user != "0" {
+		homeDir = "/home/" + user
+	}
+	envs := []string{
+		"HOSTNAME=" + podName,
+		"SHLVL=1",
+		"HOME=" + homeDir,
+		"TERM=xterm-256color",
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"KUBERNETES_SERVICE_HOST=10.96.0.1",
+		"KUBERNETES_SERVICE_PORT=443",
+		"PWD=/",
+	}
+	if info != nil {
+		if info.WorkDir != "" {
+			envs = append(envs, "PWD="+info.WorkDir)
+		}
+		for k, v := range info.Env {
+			envs = append(envs, k+"="+v)
+		}
+	}
+	return envs
+}
+
+
 
 func executeShellString(
 	ctx context.Context,

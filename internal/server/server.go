@@ -1614,13 +1614,23 @@ func (s *Server) servePodExec(w http.ResponseWriter, r *http.Request) {
 	// If streaming tunnel requested, hijack connection for bidirectional IO
 	if r.URL.Query().Get("stream") == "true" {
 		rc := http.NewResponseController(w)
-		conn, _, err := rc.Hijack()
+		conn, brw, err := rc.Hijack()
 		if err == nil {
 			defer conn.Close()
+			// Flush any pending buffered writes from chi/HTTP layer
+			if brw != nil {
+				_ = brw.Flush()
+			}
+			// Send upgrade handshake
 			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nConnection: Upgrade\r\nUpgrade: tarak-exec\r\n\r\n"))
-			_, _ = s.runtime.ExecCommand(r.Context(), ns, name, container, commands, conn, conn, conn, tty)
+			// Use a background context so the exec isn't cancelled when the HTTP
+			// request context times out (hijacked connections outlive the request)
+			execCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			_, _ = s.runtime.ExecCommand(execCtx, ns, name, container, commands, conn, conn, conn, tty)
 			return
 		}
+		// Hijack failed — fall through to streaming response
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1628,6 +1638,7 @@ func (s *Server) servePodExec(w http.ResponseWriter, r *http.Request) {
 
 	_, _ = s.runtime.ExecCommand(r.Context(), ns, name, container, commands, r.Body, w, w, tty)
 }
+
 
 func (s *Server) servePodPortForward(w http.ResponseWriter, r *http.Request) {
 	ns := chi.URLParam(r, "namespace")

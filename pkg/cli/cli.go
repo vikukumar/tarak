@@ -3660,16 +3660,34 @@ func newExecCmd() *cobra.Command {
 				wg.Add(2)
 				go func() {
 					defer wg.Done()
-					_, _ = io.Copy(os.Stdout, br)
+					// Copy server output to local stdout.
+					// The bufio.NewReader may have buffered some bytes already — drain those first.
+					if br.Buffered() > 0 {
+						buf := make([]byte, br.Buffered())
+						_, _ = io.ReadFull(br, buf)
+						_, _ = os.Stdout.Write(buf)
+					}
+					_, _ = io.Copy(os.Stdout, conn)
 				}()
 				go func() {
 					defer wg.Done()
-					if stdin {
-						_, _ = io.Copy(conn, os.Stdin)
+					// Always copy stdin → connection for interactive exec (-i or -t)
+					_, _ = io.Copy(conn, os.Stdin)
+				}()
+
+				// Handle Ctrl+C: send it through to the remote shell rather than killing the client
+				sigCh := make(chan os.Signal, 1)
+				signal.Notify(sigCh, os.Interrupt)
+				go func() {
+					for range sigCh {
+						_, _ = conn.Write([]byte{3}) // ETX = Ctrl+C
 					}
 				}()
+				defer signal.Stop(sigCh)
+
 				wg.Wait()
 				return nil
+
 			}
 
 			req, err := http.NewRequest(http.MethodPost, execURL, nil)
