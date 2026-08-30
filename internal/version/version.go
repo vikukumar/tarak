@@ -4,7 +4,7 @@ import "fmt"
 
 var (
 	// Version is the current semantic version of Tarak.
-	Version = "1.0.7"
+	Version = "1.0.16"
 
 	// Commit is the git commit hash at build time.
 	Commit = "a9f3c82"
